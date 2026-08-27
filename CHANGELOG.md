@@ -5,6 +5,17 @@ Format: `[YYYY-MM-DD] vX.X — Category — Description`
 
 ---
 
+## [2026-08-27] — Deployment Fixes
+
+### v0.21.0 — Vercel Deployment & Supabase Configuration
+**Files:** `api/render-pdf.ts`, `src/lib/supabase.ts`, `README.md`
+- Updated the Vercel PDF API function runtime from obsolete `nodejs18.x` to supported `nodejs`
+- Added a clear startup error when `VITE_SUPABASE_URL` or `VITE_SUPABASE_ANON_KEY` is missing
+- Documented the required Vercel Production environment variables and rebuild requirement
+- Confirmed `npm run build` passes; the Vite chunk-size message remains a non-blocking warning
+
+---
+
 ## [2026-08-26] — Project Inception & Full Build Sprint
 
 ---

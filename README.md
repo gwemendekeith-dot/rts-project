@@ -1,5 +1,16 @@
 # React + TypeScript + Vite
 
+## Deployment
+
+Set these environment variables in Vercel for the Production environment before deploying:
+
+```text
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-publishable-or-anon-key
+```
+
+Vite embeds `VITE_*` values during the build, so redeploy after adding or changing them. Do not use the Supabase service-role key in either variable.
+
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
 Currently, two official plugins are available:
