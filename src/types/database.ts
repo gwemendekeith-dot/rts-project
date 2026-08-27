@@ -381,57 +381,112 @@ export interface Database {
           pending_installations: number;
         };
       };
+      v_dashboard: {
+        Row: {
+          sales_today: number;
+          revenue_today: number;
+          cash_collected_today: number;
+          installations_today: number;
+          current_cash_balance: number;
+          obligations_due_soon: number;
+          quotes_expiring_soon: number;
+          low_stock_skus: number;
+        };
+      };
     };
     Functions: {
+      fn_create_customer: {
+        Args: {
+          p_first_name: string;
+          p_phone: string;
+          p_last_name?: string;
+          p_email?: string;
+          p_address?: string;
+          p_city?: string;
+          p_customer_type?: string;
+          p_referral_source?: string;
+          p_notes?: string;
+        };
+        Returns: Json;
+      };
+      fn_set_serial_qc: {
+        Args: {
+          p_serial_id: string;
+          p_qc_status: string;
+          p_photo_ref?: string;
+        };
+        Returns: Json;
+      };
+      fn_adjust_serial_status: {
+        Args: {
+          p_serial_id: string;
+          p_status: string;
+          p_reason: string;
+        };
+        Returns: Json;
+      };
+      fn_create_sale: {
+        Args: {
+          p_customer_id: string;
+          p_referral_partner_id?: string;
+          p_referral_source?: string;
+          p_is_preorder?: boolean;
+          p_notes?: string;
+          p_items?: Json;
+        };
+        Returns: Json;
+      };
       fn_record_payment: {
         Args: {
           p_sale_id: string;
-          p_amount_usd: number;
-          p_payment_method: PaymentMethodEnum;
-          p_reference_code?: string;
-          p_recorded_by: string;
+          p_amount: number;
+          p_method: string;
+          p_reference?: string;
         };
         Returns: Json;
       };
       fn_schedule_installation: {
         Args: {
-          p_installation_id: string;
+          p_job_id: string;
           p_installer_id: string;
-          p_scheduled_date: string;
-          p_scheduled_time_slot?: string;
-          p_notes?: string;
+          p_date: string;
         };
         Returns: Json;
       };
       fn_complete_installation: {
         Args: {
-          p_installation_id: string;
-          p_actor_id: string;
+          p_job_id: string;
+          p_gas_test: boolean;
+          p_water_test: boolean;
+          p_unit_test: boolean;
+          p_customer_handover: boolean;
+          p_signature_ref: string;
+          p_photo_refs?: string[];
+          p_installer_notes?: string;
         };
         Returns: Json;
       };
       fn_issue_refund: {
         Args: {
-          p_sale_id: string;
-          p_amount_usd: number;
+          p_payment_id: string;
+          p_amount: number;
           p_reason: string;
-          p_approved_by: string;
         };
         Returns: Json;
       };
       fn_receive_stock: {
         Args: {
           p_product_id: string;
-          p_serial_numbers: string[];
-          p_received_by: string;
+          p_serials: string[];
+          p_received_date?: string;
         };
         Returns: Json;
       };
       fn_settle_obligation: {
         Args: {
           p_obligation_id: string;
-          p_payment_method: PaymentMethodEnum;
-          p_recorded_by: string;
+          p_amount: number;
+          p_note?: string;
         };
         Returns: Json;
       };
@@ -439,14 +494,12 @@ export interface Database {
         Args: {
           p_document_id: string;
           p_reason: string;
-          p_actor_id: string;
         };
         Returns: Json;
       };
       fn_switch_role: {
         Args: {
-          p_user_id: string;
-          p_new_role: UserRoleEnum;
+          p_role: UserRoleEnum;
         };
         Returns: Json;
       };

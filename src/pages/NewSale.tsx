@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { recordPayment } from '../lib/rpc';
 import { supabase } from '../lib/supabase';
+import { openWhatsApp } from '../lib/whatsapp';
+import { issueInvoice, issueReceipt } from '../lib/documents';
 import { useNewSaleDraft } from '../hooks/useNewSaleDraft';
 import { 
   User, 
@@ -74,7 +76,7 @@ export const NewSale: React.FC = () => {
   // Section 5: Confirmation Modal & Success State
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [completedDoc, setCompletedDoc] = useState<{ inv: string; rcp?: string } | null>(null);
+  const [completedDoc, setCompletedDoc] = useState<{ inv: string; invoiceUrl: string; rcp?: string } | null>(null);
 
   // ── Restore draft on mount ──────────────────────────────────────────────────
   useEffect(() => {
@@ -124,7 +126,7 @@ export const NewSale: React.FC = () => {
   useEffect(() => {
     async function loadCatalog() {
       try {
-        const { data: prodData } = await supabase.from('products').select('*').eq('is_active', true);
+        const { data: prodData } = await supabase.from('products').select('*').eq('active', true);
         if (prodData) setProducts(prodData);
 
         const { data: serialData } = await supabase.from('serial_numbers').select('*').eq('status', 'AVAILABLE');
@@ -183,22 +185,21 @@ export const NewSale: React.FC = () => {
       
       if (custData) customerId = custData.id;
 
-      const invNum = `RTS-INV-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-      const { data: saleData } = await supabase
-        .from('sales')
-        .insert({
-          sale_number: invNum,
-          customer_id: customerId,
-          referral_partner_id: referralPartnerId || null,
-          sale_status: amountPaidNow > 0 ? 'CONFIRMED' : 'PENDING',
-          payment_status: amountPaidNow >= grandTotal ? 'PAID' : amountPaidNow > 0 ? 'PARTIAL' : 'UNPAID',
-          total_amount_usd: grandTotal,
-          paid_amount_usd: 0
-        })
-        .select()
-        .single();
-
-      const saleId = saleData ? saleData.id : 'mock-sale-1';
+      const { data: saleData, error: saleError } = await supabase.rpc('fn_create_sale', {
+        p_customer_id: customerId,
+        p_referral_partner_id: referralPartnerId || null,
+        p_is_preorder: lineItems.some(item => item.is_preorder),
+        p_items: lineItems.map(item => ({
+          product_id: item.product_id,
+          quantity: item.quantity,
+          unit_price: item.unit_price_usd,
+          discount: 0,
+          serial_number_id: item.serial_number_id || null,
+        })),
+      });
+      if (saleError) throw saleError;
+      const saleId = saleData?.sale_id as string;
+      if (!saleId) throw new Error('Sale creation did not return an ID');
 
       let rcpNum: string | undefined;
       if (amountPaidNow > 0) {
@@ -207,20 +208,23 @@ export const NewSale: React.FC = () => {
           amount_usd: amountPaidNow,
           payment_method: paymentMethod,
           reference_code: paymentReference,
-          recorded_by: '00000000-0000-0000-0000-000000000000'
+          recorded_by: saleId,
         }) as { receipt_number?: string };
 
-        rcpNum = payRes?.receipt_number || `RTS-RCP-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+        const { data: latestPayment } = await supabase.from('payments')
+          .select('id').eq('sale_id', saleId).order('payment_date', { ascending: false }).limit(1).single();
+        if (latestPayment) await issueReceipt(saleId, latestPayment.id);
+        rcpNum = payRes?.receipt_number;
       }
 
+      const invoiceUrl = await issueInvoice(saleId);
+
       await clearDraft(); // Delete draft on successful submission
-      setCompletedDoc({ inv: invNum, rcp: rcpNum });
+      setCompletedDoc({ inv: String(saleData?.sale_number ?? saleId), invoiceUrl, rcp: rcpNum });
       setShowConfirmModal(false);
-    } catch {
-      setCompletedDoc({
-        inv: `RTS-INV-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-        rcp: amountPaidNow > 0 ? `RTS-RCP-2026-${Math.floor(1000 + Math.random() * 9000)}` : undefined
-      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      alert(`Could not complete sale: ${message}`);
       setShowConfirmModal(false);
     } finally {
       setSubmitting(false);
@@ -228,10 +232,10 @@ export const NewSale: React.FC = () => {
   };
 
   const handleWhatsAppSend = () => {
-    const message = encodeURIComponent(
-      `Hello ${customerName}, thank you for choosing Rafiki Thermal Solutions! Your Invoice #${completedDoc?.inv} (Total: $${grandTotal.toFixed(2)}) is ready. Hot Water on The Go!`
+    openWhatsApp(
+      customerPhone,
+      `Hello ${customerName}, thank you for choosing Rafiki Thermal Solutions! Your Invoice #${completedDoc?.inv} (Total: $${grandTotal.toFixed(2)}) is ready at ${completedDoc?.invoiceUrl}. Hot Water on The Go!`,
     );
-    window.open(`https://wa.me/${customerPhone.replace(/[^0-9]/g, '')}?text=${message}`, '_blank');
   };
 
   if (completedDoc) {

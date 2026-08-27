@@ -1,2 +1,2 @@
 // Installation components barrel export
-export {};
+export { SignaturePad } from './SignaturePad';

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useRole } from '../../hooks/useRole';
+import { useAuth } from '../../hooks/useAuth';
 import { RoleSwitcher } from './RoleSwitcher';
 import { 
   Flame, 
@@ -24,7 +25,8 @@ import {
 } from 'lucide-react';
 
 export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isOwner } = useRole();
+  const { isOwner, fullName } = useRole();
+  const { signOut } = useAuth();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -184,6 +186,13 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             >
               <PlusCircle className="w-4 h-4" />
               <span>＋ New Sale</span>
+            </button>
+            <span className="hidden text-xs text-slate-400 lg:inline">{fullName}</span>
+            <button
+              onClick={() => signOut()}
+              className="text-xs text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              Sign out
             </button>
           </div>
         </header>

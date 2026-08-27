@@ -1,3 +1,4 @@
+import { openWhatsApp } from '../lib/whatsapp';
 import React, { useState } from 'react';
 import { useRole } from '../hooks/useRole';
 import { voidDocument } from '../lib/rpc';
@@ -53,8 +54,7 @@ export const Documents: React.FC = () => {
     try {
       await voidDocument({
         document_id: docId,
-        reason: 'Operator void request',
-        actor_id: '00000000-0000-0000-0000-000000000000'
+        reason: 'Operator void request'
       });
       setDocs(docs.map(d => d.id === docId ? { ...d, is_void: true } : d));
     } catch {
@@ -130,7 +130,7 @@ export const Documents: React.FC = () => {
                         <span>View / Download</span>
                       </button>
                       <button
-                        onClick={() => window.open(`https://wa.me/${doc.customer_phone}`, '_blank')}
+                        onClick={() => doc.customer_phone && openWhatsApp(doc.customer_phone, `Your Rafiki Thermal Solutions document ${doc.doc_number} is ready.`)}
                         className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded text-[11px] font-semibold flex items-center space-x-1"
                       >
                         <Send className="w-3.5 h-3.5" />

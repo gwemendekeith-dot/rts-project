@@ -4,11 +4,22 @@ import type { UserRoleEnum } from '../../types/database';
 import { Shield, ShieldAlert, UserCheck } from 'lucide-react';
 
 export const RoleSwitcher: React.FC = () => {
-  const { activeRole, switchRole, isOwner } = useRole();
+  const { activeRole, heldRoles, switchRole, isOwner, isLoading } = useRole();
+  const [busy, setBusy] = React.useState(false);
+
+  if (isLoading || !activeRole) return null;
 
   const handleRoleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newRole = e.target.value as UserRoleEnum;
-    await switchRole(newRole);
+    setBusy(true);
+    try {
+      await switchRole(newRole);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      alert(message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -24,11 +35,14 @@ export const RoleSwitcher: React.FC = () => {
       <select
         value={activeRole}
         onChange={handleRoleChange}
+        disabled={busy}
         className="bg-transparent text-xs font-semibold text-rafiki-400 focus:outline-none cursor-pointer"
       >
-        <option value="OWNER" className="bg-slate-900 text-slate-100">OWNER (Keith / Thokozani)</option>
-        <option value="SALES" className="bg-slate-900 text-slate-100">SALES Desk</option>
-        <option value="OPERATIONS" className="bg-slate-900 text-slate-100">OPERATIONS Desk</option>
+        {heldRoles.map((role) => (
+          <option key={role} value={role} className="bg-slate-900 text-slate-100">
+            {role === 'OWNER' ? 'OWNER (Keith / Thokozani)' : `${role} Desk`}
+          </option>
+        ))}
       </select>
     </div>
   );

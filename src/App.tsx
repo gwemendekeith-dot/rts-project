@@ -8,14 +8,16 @@ import { NewSale } from './pages/NewSale';
 import { SaleWorkspace } from './pages/SaleWorkspace';
 import { Inventory } from './pages/Inventory';
 import { Installations } from './pages/Installations';
+import { InstallationDetail } from './pages/InstallationDetail';
 import { Customers } from './pages/Customers';
+import { Customer360 } from './pages/Customer360';
 import { Warranties } from './pages/Warranties';
 import { Documents } from './pages/Documents';
 import { Reports } from './pages/Reports';
 import { OfflineBanner, ReconnectedToast, InstallPrompt } from './components/ui/InstallPrompt';
 
 const ProtectedLayout: React.FC = () => {
-  const { user, loading } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
     return (
@@ -25,7 +27,7 @@ const ProtectedLayout: React.FC = () => {
     );
   }
 
-  if (!user && import.meta.env.VITE_SUPABASE_URL !== 'https://mock.supabase.co') {
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
@@ -34,11 +36,14 @@ const ProtectedLayout: React.FC = () => {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/new-sale" element={<NewSale />} />
+        <Route path="/sales/new" element={<NewSale />} />
         <Route path="/sales/:saleId" element={<SaleWorkspace />} />
         <Route path="/sales" element={<SaleWorkspace />} />
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/installations" element={<Installations />} />
+        <Route path="/installations/:jobId" element={<InstallationDetail />} />
         <Route path="/customers" element={<Customers />} />
+        <Route path="/customers/:customerId" element={<Customer360 />} />
         <Route path="/warranties" element={<Warranties />} />
         <Route path="/documents" element={<Documents />} />
         <Route path="/receipts" element={<Documents />} />

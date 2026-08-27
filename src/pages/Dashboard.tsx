@@ -1,325 +1,163 @@
-import React, { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
-import { useRole } from '../hooks/useRole';
-import { 
-  DollarSign, 
-  ShoppingCart, 
-  Wrench, 
-  AlertTriangle, 
-  Clock, 
-  AlertCircle, 
-  TrendingUp, 
-  ArrowRight,
-  ShieldCheck,
-  FileCheck,
-  MessageSquare
-} from 'lucide-react';
-import { Link } from 'react-router-dom';
 
-interface CashPosition {
-  total_collected_usd: number;
-  total_payouts_usd: number;
-  net_cash_usd: number;
-}
+const fmtUSD = (value: number) => `$${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+const daysUntil = (date: string) => Math.ceil((new Date(date).getTime() - Date.now()) / 86_400_000);
 
-interface StockItem {
-  product_id: string;
+type PipelineRow = { stage: string; count: number };
+type StockRow = {
   sku: string;
-  name: string;
-  selling_price_usd: number;
-  available_units: number;
-  reserved_units: number;
-  installed_units: number;
-  units_sold_28d: number;
-  days_of_stock: number | null;
+  quantity_available: number;
+  days_of_stock_remaining: number | null;
   restock_status: string;
-}
+};
+type AttentionData = {
+  obligations: Array<{ description: string; due_date: string; total_amount: number; amount_paid: number }>;
+  installs: Array<{ job_number: string; address: string; scheduled_date: string }>;
+  quotes: Array<{ quote_number: string; customer_id: string; valid_until: string }>;
+};
 
-interface PipelineSummary {
-  stage_1_enquiries_new: number;
-  stage_2_quotes_open: number;
-  stage_3_sales_confirmed: number;
-  stage_4_installations_pending: number;
-  stage_5_installations_completed: number;
-  stage_6_warranties_active: number;
-}
-
-export const Dashboard: React.FC = () => {
-  const { activeRole } = useRole();
-  const [cashPosition, setCashPosition] = useState<CashPosition>({ total_collected_usd: 0, total_payouts_usd: 0, net_cash_usd: 0 });
-  const [stockItems, setStockItems] = useState<StockItem[]>([]);
-  const [pipeline, setPipeline] = useState<PipelineSummary>({
-    stage_1_enquiries_new: 0,
-    stage_2_quotes_open: 0,
-    stage_3_sales_confirmed: 0,
-    stage_4_installations_pending: 0,
-    stage_5_installations_completed: 0,
-    stage_6_warranties_active: 0,
+export function Dashboard() {
+  const dash = useQuery({
+    queryKey: ['v_dashboard'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('v_dashboard').select('*').single();
+      if (error) throw error;
+      return data;
+    },
   });
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function loadDashboardData() {
-      try {
-        // Fetch Cash Position View
-        const { data: cashData } = await supabase.from('v_cash_position').select('*').limit(1).single();
-        if (cashData) setCashPosition(cashData);
+  const pipeline = useQuery({
+    queryKey: ['v_pipeline_summary'],
+    queryFn: async (): Promise<PipelineRow[]> => {
+      const { data, error } = await supabase.from('v_pipeline_summary').select('*');
+      if (error) throw error;
+      return (data ?? []) as unknown as PipelineRow[];
+    },
+  });
 
-        // Fetch Stock Dashboard View
-        const { data: stockData } = await supabase.from('v_stock_dashboard').select('*');
-        if (stockData) setStockItems(stockData);
+  const stock = useQuery({
+    queryKey: ['v_stock_dashboard'],
+    queryFn: async (): Promise<StockRow[]> => {
+      const { data, error } = await supabase.from('v_stock_dashboard').select('*');
+      if (error) throw error;
+      return (data ?? []) as unknown as StockRow[];
+    },
+  });
 
-        // Fetch Pipeline Summary View
-        const { data: pipelineData } = await supabase.from('v_pipeline_summary').select('*').limit(1).single();
-        if (pipelineData) setPipeline(pipelineData);
-      } catch {
-        // Mock data fallback
-        setCashPosition({ total_collected_usd: 3534.50, total_payouts_usd: 874.50, net_cash_usd: 2660.00 });
-        setStockItems([
-          { product_id: '1', sku: 'GH-12L', name: '12L Gas Geyser', selling_price_usd: 150, available_units: 0, reserved_units: 0, installed_units: 0, units_sold_28d: 0, days_of_stock: null, restock_status: 'NO_SALES_YET' },
-          { product_id: '2', sku: 'GH-16L', name: '16L Gas Geyser', selling_price_usd: 220, available_units: 0, reserved_units: 0, installed_units: 0, units_sold_28d: 0, days_of_stock: null, restock_status: 'NO_SALES_YET' },
-          { product_id: '3', sku: 'GH-20L', name: '20L Gas Geyser', selling_price_usd: 280, available_units: 0, reserved_units: 0, installed_units: 0, units_sold_28d: 0, days_of_stock: null, restock_status: 'NO_SALES_YET' },
-        ]);
-        setPipeline({
-          stage_1_enquiries_new: 3,
-          stage_2_quotes_open: 2,
-          stage_3_sales_confirmed: 4,
-          stage_4_installations_pending: 2,
-          stage_5_installations_completed: 12,
-          stage_6_warranties_active: 12,
-        });
-      } finally {
-        setLoading(false);
-      }
-    }
+  const attention = useQuery({
+    queryKey: ['attention_queue'],
+    queryFn: async (): Promise<AttentionData> => {
+      const cutoff30 = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+      const cutoff2 = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
+      const today = new Date().toISOString().slice(0, 10);
+      const [obligations, installs, quotes] = await Promise.all([
+        supabase.from('obligations').select('description,due_date,total_amount,amount_paid')
+          .neq('status', 'SETTLED').lte('due_date', cutoff30),
+        supabase.from('installations').select('job_number,address,scheduled_date')
+          .eq('scheduled_date', today).in('status', ['SCHEDULED', 'ASSIGNED', 'IN_PROGRESS']),
+        supabase.from('quotes').select('quote_number,customer_id,valid_until')
+          .in('status', ['SENT', 'VIEWED']).lte('valid_until', cutoff2),
+      ]);
+      const failed = [obligations, installs, quotes].find(result => result.error);
+      if (failed?.error) throw failed.error;
+      return {
+        obligations: obligations.data ?? [],
+        installs: installs.data ?? [],
+        quotes: quotes.data ?? [],
+      };
+    },
+  });
 
-    loadDashboardData();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64 text-xs text-slate-400">
-        Loading Command Centre Metrics...
-      </div>
-    );
+  if (dash.isLoading || pipeline.isLoading || stock.isLoading || attention.isLoading) {
+    return <div className="p-10 text-center text-slate-400">Loading dashboard...</div>;
   }
 
+  const metrics = dash.data;
+  const hasUrgentItems = Boolean(
+    (metrics?.obligations_due_soon ?? 0) > 0 ||
+    (attention.data?.installs.length ?? 0) > 0 ||
+    (metrics?.quotes_expiring_soon ?? 0) > 0,
+  );
+
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      {/* Top Banner & Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-extrabold text-white tracking-tight">Command Centre</h1>
-          <p className="text-xs text-slate-400">Operational Source of Truth • Harare Desk ({activeRole})</p>
-        </div>
-        <div className="inline-flex items-center space-x-2 bg-slate-900 border border-slate-800 text-xs px-3 py-1.5 rounded-lg text-slate-300">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span>Prices in USD • Not VAT-registered</span>
-        </div>
+    <div className="mx-auto max-w-7xl space-y-6">
+      <h1 className="text-2xl font-bold text-white">Command Centre</h1>
+
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <Card label="Sales Today" value={metrics?.sales_today ?? 0} />
+        <Card label="Revenue Today" value={fmtUSD(metrics?.revenue_today ?? 0)} accent />
+        <Card label="Cash Collected" value={fmtUSD(metrics?.cash_collected_today ?? 0)} accent />
+        <Card label="Installs Today" value={metrics?.installations_today ?? 0} />
+        <Card label="Cash Balance" value={fmtUSD(metrics?.current_cash_balance ?? 0)} />
       </div>
 
-      {/* Today's Key Performance Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <div className="flex justify-between items-start">
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Net Cash Position</span>
-              <span className="text-2xl font-extrabold text-white mt-1 block font-mono">
-                ${cashPosition.net_cash_usd.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              </span>
-            </div>
-            <div className="p-2.5 bg-emerald-500/10 rounded-xl text-emerald-400">
-              <DollarSign className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-3 text-[11px] text-slate-400">
-            Collections: <span className="text-slate-200 font-semibold">${cashPosition.total_collected_usd.toFixed(2)}</span>
-          </div>
-        </div>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Needs Attention</h2>
+          <ul className="space-y-2 text-sm">
+            {(metrics?.obligations_due_soon ?? 0) > 0 && (
+              <li className="rounded-md bg-red-500/10 px-3 py-2 text-red-300">
+                {metrics.obligations_due_soon} obligation(s) due within 30 days
+              </li>
+            )}
+            {attention.data?.installs.map(install => (
+              <li key={install.job_number} className="rounded-md bg-amber-500/10 px-3 py-2 text-amber-300">
+                Install {install.job_number} today - {install.address}
+              </li>
+            ))}
+            {(metrics?.quotes_expiring_soon ?? 0) > 0 && (
+              <li className="rounded-md bg-amber-500/10 px-3 py-2 text-amber-300">
+                {metrics.quotes_expiring_soon} quote(s) expiring in 48h
+              </li>
+            )}
+            {attention.data?.obligations.map(obligation => (
+              <li key={`${obligation.description}-${obligation.due_date}`} className="rounded-md bg-slate-950 px-3 py-2 text-slate-400">
+                {obligation.description} - {fmtUSD(obligation.total_amount - obligation.amount_paid)} due in {daysUntil(obligation.due_date)}d
+              </li>
+            ))}
+            {!hasUrgentItems && <li className="text-slate-500">Nothing urgent - all clear.</li>}
+          </ul>
+        </section>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <div className="flex justify-between items-start">
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Confirmed Sales</span>
-              <span className="text-2xl font-extrabold text-white mt-1 block font-mono">
-                {pipeline.stage_3_sales_confirmed} Jobs
-              </span>
-            </div>
-            <div className="p-2.5 bg-rafiki-500/10 rounded-xl text-rafiki-400">
-              <ShoppingCart className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-3 text-[11px] text-slate-400">
-            Awaiting fulfilment scheduling
-          </div>
-        </div>
+        <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Sales Pipeline</h2>
+          <ul className="space-y-2">
+            {pipeline.data?.map(item => (
+              <li key={item.stage} className="flex items-center justify-between text-sm">
+                <span className="text-slate-400">{item.stage}</span>
+                <span className="rounded-full bg-slate-700 px-2.5 py-0.5 text-xs font-semibold text-white">{item.count}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <div className="flex justify-between items-start">
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Pending Installs</span>
-              <span className="text-2xl font-extrabold text-amber-400 mt-1 block font-mono">
-                {pipeline.stage_4_installations_pending} Jobs
-              </span>
-            </div>
-            <div className="p-2.5 bg-amber-500/10 rounded-xl text-amber-400">
-              <Wrench className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-3 text-[11px] text-slate-400">
-            Field technicians assigned
-          </div>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-          <div className="flex justify-between items-start">
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Active Warranties</span>
-              <span className="text-2xl font-extrabold text-blue-400 mt-1 block font-mono">
-                {pipeline.stage_6_warranties_active} Active
-              </span>
-            </div>
-            <div className="p-2.5 bg-blue-500/10 rounded-xl text-blue-400">
-              <ShieldCheck className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="mt-3 text-[11px] text-slate-400">
-            6-month period from completion
-          </div>
-        </div>
-      </div>
-
-      {/* Attention Queue */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-        <div className="flex items-center space-x-2 border-b border-slate-800 pb-3">
-          <AlertTriangle className="w-4 h-4 text-amber-400" />
-          <h2 className="font-bold text-sm text-white">Attention Queue</h2>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-          <div className="bg-slate-950 border border-slate-800 p-3.5 rounded-lg flex items-start space-x-3">
-            <Clock className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-semibold text-slate-200 block">Factory Balance Obligation</span>
-              <span className="text-slate-400 block mt-0.5">$2,040.50 due 2026-09-25</span>
-            </div>
-          </div>
-
-          <div className="bg-slate-950 border border-slate-800 p-3.5 rounded-lg flex items-start space-x-3">
-            <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-semibold text-slate-200 block">Stock Reorder Warning</span>
-              <span className="text-slate-400 block mt-0.5">Unit inventory available quantity at 0</span>
-            </div>
-          </div>
-
-          <div className="bg-slate-950 border border-slate-800 p-3.5 rounded-lg flex items-start space-x-3">
-            <TrendingUp className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-semibold text-slate-200 block">Investor Option A Obligation</span>
-              <span className="text-slate-400 block mt-0.5">$1,151.00 return threshold</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Commercial Pipeline Tracker (6 Stages) */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
-        <h2 className="font-bold text-sm text-white border-b border-slate-800 pb-3">Commercial Pipeline Snapshot (v_pipeline_summary)</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
-          <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg text-center">
-            <MessageSquare className="w-4 h-4 text-slate-400 mx-auto mb-1" />
-            <span className="text-slate-400 text-[10px] uppercase font-bold block">1. Enquiries</span>
-            <span className="text-lg font-extrabold text-white">{pipeline.stage_1_enquiries_new}</span>
-          </div>
-
-          <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg text-center">
-            <FileCheck className="w-4 h-4 text-slate-400 mx-auto mb-1" />
-            <span className="text-slate-400 text-[10px] uppercase font-bold block">2. Open Quotes</span>
-            <span className="text-lg font-extrabold text-white">{pipeline.stage_2_quotes_open}</span>
-          </div>
-
-          <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg text-center">
-            <ShoppingCart className="w-4 h-4 text-rafiki-400 mx-auto mb-1" />
-            <span className="text-slate-400 text-[10px] uppercase font-bold block">3. Confirmed</span>
-            <span className="text-lg font-extrabold text-rafiki-400">{pipeline.stage_3_sales_confirmed}</span>
-          </div>
-
-          <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg text-center">
-            <Wrench className="w-4 h-4 text-amber-400 mx-auto mb-1" />
-            <span className="text-slate-400 text-[10px] uppercase font-bold block">4. Scheduled</span>
-            <span className="text-lg font-extrabold text-amber-400">{pipeline.stage_4_installations_pending}</span>
-          </div>
-
-          <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg text-center">
-            <Wrench className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
-            <span className="text-slate-400 text-[10px] uppercase font-bold block">5. Installed</span>
-            <span className="text-lg font-extrabold text-emerald-400">{pipeline.stage_5_installations_completed}</span>
-          </div>
-
-          <div className="bg-slate-950 border border-slate-800 p-3 rounded-lg text-center">
-            <ShieldCheck className="w-4 h-4 text-blue-400 mx-auto mb-1" />
-            <span className="text-slate-400 text-[10px] uppercase font-bold block">6. Warranties</span>
-            <span className="text-lg font-extrabold text-blue-400">{pipeline.stage_6_warranties_active}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Stock Dashboard Table (v_stock_dashboard) */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4 overflow-hidden">
-        <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-          <h2 className="font-bold text-sm text-white">Stock Dashboard (v_stock_dashboard)</h2>
-          <Link to="/inventory" className="text-xs text-rafiki-400 hover:text-rafiki-300 font-semibold flex items-center space-x-1">
-            <span>Manage Serials</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-slate-800 text-slate-400 font-semibold uppercase text-[10px] tracking-wider">
-                <th className="py-2.5 px-3">SKU</th>
-                <th className="py-2.5 px-3">Product Name</th>
-                <th className="py-2.5 px-3">Price (USD)</th>
-                <th className="py-2.5 px-3 text-right">Available</th>
-                <th className="py-2.5 px-3 text-right">Reserved</th>
-                <th className="py-2.5 px-3 text-right">Days of Stock</th>
-                <th className="py-2.5 px-3 text-center">Restock Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {stockItems.map((item) => (
-                <tr key={item.product_id} className="hover:bg-slate-850/50 transition-colors">
-                  <td className="py-3 px-3 font-mono font-bold text-slate-200">{item.sku}</td>
-                  <td className="py-3 px-3 text-slate-300">{item.name}</td>
-                  <td className="py-3 px-3 font-mono text-slate-200">${item.selling_price_usd.toFixed(2)}</td>
-                  <td className="py-3 px-3 text-right font-mono font-bold text-white">{item.available_units}</td>
-                  <td className="py-3 px-3 text-right font-mono text-slate-400">{item.reserved_units}</td>
-                  <td className="py-3 px-3 text-right font-mono text-slate-300">
-                    {item.days_of_stock === null ? 'No sales yet' : `${item.days_of_stock} days`}
-                  </td>
-                  <td className="py-3 px-3 text-center">
-                    {item.restock_status === 'RESTOCK_REQUIRED' || item.available_units === 0 ? (
-                      <span className="bg-red-500/10 border border-red-500/30 text-red-400 text-[10px] font-bold px-2 py-0.5 rounded-full inline-block animate-pulse">
-                        REORDER NOW
-                      </span>
-                    ) : item.restock_status === 'NO_SALES_YET' ? (
-                      <span className="bg-slate-800 text-slate-400 text-[10px] px-2 py-0.5 rounded-full inline-block">
-                        No Sales Yet
-                      </span>
-                    ) : (
-                      <span className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full inline-block">
-                        HEALTHY
-                      </span>
-                    )}
-                  </td>
+        <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Stock &amp; Days Remaining</h2>
+          <table className="w-full text-sm">
+            <thead><tr className="text-left text-xs uppercase text-slate-500"><th className="py-1">SKU</th><th>Avail</th><th>Days</th><th>Status</th></tr></thead>
+            <tbody>
+              {stock.data?.map(item => (
+                <tr key={item.sku} className="border-t border-slate-800">
+                  <td className="py-2 font-medium text-slate-300">{item.sku}</td>
+                  <td className="text-slate-400">{item.quantity_available}</td>
+                  <td className="text-slate-400">{item.days_of_stock_remaining ?? '-'}</td>
+                  <td><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${item.restock_status === 'REORDER_NOW' ? 'bg-red-500/10 text-red-300' : item.restock_status === 'NO_SALES_YET' ? 'bg-slate-800 text-slate-500' : 'bg-emerald-500/10 text-emerald-300'}`}>{item.restock_status === 'REORDER_NOW' ? 'REORDER NOW' : item.restock_status === 'NO_SALES_YET' ? 'No sales yet' : 'OK'}</span></td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </section>
       </div>
     </div>
   );
-};
+}
+
+function Card({ label, value, accent = false }: { label: string; value: string | number; accent?: boolean }) {
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+      <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
+      <div className={`mt-1 text-2xl font-bold ${accent ? 'text-amber-400' : 'text-white'}`}>{value}</div>
+    </div>
+  );
+}
