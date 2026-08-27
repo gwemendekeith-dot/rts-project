@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Helvetica, Arial, sans-serif; color: #1e293b; margin: 0; font-size: 13px; line-height: 1.5; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start;
+            border-bottom: 3px solid #f59e0b; padding-bottom: 16px; margin-bottom: 20px; }
+  .brand { display: flex; gap: 12px; align-items: center; }
+  .logo { width: 56px; height: 56px; background: #0f172a; color: #fff; border-radius: 10px;
+          display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 700; }
+  .brand h1 { margin: 0; font-size: 20px; color: #0f172a; }
+  .brand .tagline { color: #f59e0b; font-weight: 600; font-style: italic; font-size: 12px; margin: 2px 0; }
+  .brand .loc { color: #64748b; font-size: 11px; margin: 0; }
+  .doc-title { text-align: right; }
+  .doc-title h2 { margin: 0; font-size: 24px; letter-spacing: 1px; color: #0f172a; }
+  .meta { width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 12px; }
+  .meta td { padding: 3px 6px; }
+  .meta .k { color: #64748b; width: 130px; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
+           text-transform: uppercase; background: #dcfce7; color: #166534; }
+  table.items { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+  table.items th { background: #0f172a; color: #fff; text-align: left; padding: 9px; font-size: 11px;
+                   text-transform: uppercase; letter-spacing: .5px; }
+  table.items td { padding: 9px; border-bottom: 1px solid #e2e8f0; }
+  .r { text-align: right; }
+  .serial { color: #b45309; font-weight: 700; }
+  .totals { width: 300px; margin-left: auto; }
+  .totals .row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #e2e8f0; }
+  .totals .final { border-top: 2px solid #0f172a; border-bottom: none; margin-top: 8px; padding-top: 12px;
+                   font-size: 17px; font-weight: 700; color: #0f172a; }
+  .terms { margin-top: 28px; border-top: 2px solid #e2e8f0; padding-top: 14px; font-size: 10.5px; color: #475569; }
+  .terms h4 { margin: 0 0 8px; color: #0f172a; font-size: 13px; }
+  .terms p { margin: 6px 0; }
+  .vat { font-style: italic; font-weight: 700; color: #dc2626; }
+  .footer { margin-top: 22px; text-align: center; font-size: 12px; color: #64748b; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">
+      <div class="logo">R</div>
+      <div>
+        <h1>RAFIKI THERMAL SOLUTIONS</h1>
+        <p class="tagline">Hot Water on The Go, Smart Living</p>
+        <p class="loc">Harare, Zimbabwe &nbsp;|&nbsp; {{ WHATSAPP }}</p>
+      </div>
+    </div>
+    <div class="doc-title"><h2>SALES RECEIPT</h2></div>
+  </div>
+
+  <table class="meta">
+    <tr><td class="k">Receipt No.</td><td><strong>{{ DOCUMENT_NUMBER }}</strong></td>
+        <td class="k">Payment Method</td><td>{{ PAYMENT_METHOD }}</td></tr>
+    <tr><td class="k">Date</td><td>{{ ISSUE_DATE }}</td>
+        <td class="k">Reference</td><td>{{ PAYMENT_REFERENCE }}</td></tr>
+    <tr><td class="k">Customer</td><td><strong>{{ CUSTOMER_NAME }}</strong></td>
+        <td class="k">Status</td><td><span class="badge">{{ PAYMENT_STATUS }}</span></td></tr>
+  </table>
+
+  <table class="items">
+    <thead>
+      <tr><th>Description</th><th>Serial No.</th><th class="r">Qty</th>
+          <th class="r">Unit Price</th><th class="r">Amount</th></tr>
+    </thead>
+    <tbody>{{ LINE_ITEMS_ROWS }}</tbody>
+  </table>
+
+  <div class="totals">
+    <div class="row"><span>Subtotal</span><span>${{ SUBTOTAL }}</span></div>
+    <div class="final"><span>TOTAL PAID</span><span>${{ TOTAL_PAID }}</span></div>
+  </div>
+
+  <div class="terms">
+    <h4>Terms &amp; Conditions</h4>
+    <p><strong>1. Warranty:</strong> This unit is covered by a 6-month Rafiki Thermal Solutions warranty from the date of installation, covering manufacturing defects only. The warranty is void if the unit is tampered with, altered, or repaired/serviced by any person not authorized by Rafiki Thermal Solutions, or if it is damaged through misuse, incorrect installation by third parties, or use outside the manufacturer's specifications. Retain this receipt as proof of purchase; it is required for any warranty claim.</p>
+    <p><strong>2. Liability &amp; Safety:</strong> Installation was carried out in line with standard gas safety practice. Rafiki Thermal Solutions accepts no liability for damage, injury, or malfunction arising from unauthorized modification, relocation, or servicing of the unit after handover, or from third-party plumbing, gas, or electrical work not performed by Rafiki Thermal Solutions or its appointed technicians.</p>
+    <p><strong>3. Returns &amp; Exchanges:</strong> Given the nature of installed gas appliances, this sale is final; no refunds or exchanges are offered once the unit has been installed and tested, except where the warranty in Clause 1 applies.</p>
+    <p><strong>4. Handover Confirmation:</strong> By accepting this receipt, the customer confirms the unit was inspected, tested, and found to be in good working order at the time of installation.</p>
+    <p class="vat">Prices in USD. Rafiki Thermal Solutions is not VAT-registered.</p>
+  </div>
+
+  <div class="footer">Thank you for choosing Rafiki Thermal Solutions.</div>
+</body>
+</html>

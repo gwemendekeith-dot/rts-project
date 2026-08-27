@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Warranty Certificate - {{warranty_number}}</title>
+  <style>
+    @page { size: A4; margin: 15mm; }
+    * { box-sizing: border-box; }
+    body { font-family: Helvetica, Arial, sans-serif; color: #0f172a; margin: 0; line-height: 1.5; }
+    .cert { border: 8px double #0f172a; padding: 40px; position: relative; }
+    .corner { position: absolute; width: 36px; height: 36px; border: 4px solid #f59e0b; }
+    .tl { top: 8px; left: 8px; border-right: none; border-bottom: none; }
+    .tr { top: 8px; right: 8px; border-left: none; border-bottom: none; }
+    .bl { bottom: 8px; left: 8px; border-right: none; border-top: none; }
+    .br { bottom: 8px; right: 8px; border-left: none; border-top: none; }
+    .head { text-align: center; margin-bottom: 30px; }
+    .head h1 { font-size: 32px; letter-spacing: 4px; text-transform: uppercase; margin: 0; }
+    .head p { color: #f59e0b; font-weight: 700; margin: 8px 0 0; font-size: 16px; }
+    .head .number { color: #64748b; font-size: 12px; margin-top: 5px; }
+    .serialbox { text-align: center; background: #f8fafc; padding: 18px; border-radius: 8px; margin: 26px 0; }
+    .serialbox .lbl { font-size: 13px; color: #64748b; }
+    .serialbox .val { font-size: 30px; font-family: monospace; color: #b45309; letter-spacing: 2px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; margin: 30px 0; font-size: 15px; }
+    .grid .lbl { font-size: 11px; text-transform: uppercase; color: #64748b; margin-bottom: 4px; }
+    .grid .val { font-size: 18px; font-weight: 700; border-bottom: 2px solid #e2e8f0; padding-bottom: 4px; }
+    .expiry { color: #dc2626; }
+    .clause { font-size: 13px; line-height: 1.6; color: #334155; margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 16px; }
+    .sigs { display: flex; justify-content: space-between; margin-top: 50px; }
+    .sig { width: 200px; border-top: 1px solid #0f172a; text-align: center; padding-top: 8px; font-size: 11px; color: #64748b; }
+    .disclaimer { text-align: center; font-size: 10px; color: #94a3b8; margin-top: 24px; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="cert">
+    <div class="corner tl"></div><div class="corner tr"></div>
+    <div class="corner bl"></div><div class="corner br"></div>
+
+    <div class="head">
+      <h1>Warranty Certificate</h1>
+      <p>RAFIKI THERMAL SOLUTIONS</p>
+      <div class="number">Certificate # {{warranty_number}}</div>
+    </div>
+
+    <div class="serialbox">
+      <div class="lbl">Registered Unit Serial Number</div>
+      <div class="val">{{serial_number}}</div>
+    </div>
+
+    <div class="grid">
+      <div><div class="lbl">Customer Name</div><div class="val">{{customer_name}}</div></div>
+      <div><div class="lbl">Product Model</div><div class="val">{{product_name}} ({{product_sku}})</div></div>
+      <div><div class="lbl">Installation Date</div><div class="val">{{start_date}}</div></div>
+      <div><div class="lbl">Warranty Expiry Date</div><div class="val expiry">{{expiry_date}}</div></div>
+    </div>
+
+    <div class="clause">
+      <strong>Warranty Terms:</strong> This unit is covered by a 6-month Rafiki Thermal Solutions warranty
+      from the date of installation, covering manufacturing defects only. The warranty is void if the unit is
+      tampered with, altered, or repaired/serviced by any person not authorized by Rafiki Thermal Solutions,
+      or if it is damaged through misuse, incorrect installation by third parties, or use outside the
+      manufacturer's specifications. Retain your original sales receipt as proof of purchase; it is required
+      for any warranty claim.
+    </div>
+
+    <div class="sigs">
+      <div class="sig">Installer Signature</div>
+      <div class="sig">Customer Signature</div>
+    </div>
+
+    <div class="disclaimer">Prices in USD. Rafiki Thermal Solutions is not VAT-registered.</div>
+  </div>
+</body>
+</html>
