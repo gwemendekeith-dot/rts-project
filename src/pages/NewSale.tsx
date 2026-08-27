@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { recordPayment } from '../lib/rpc';
+import { createCustomer, recordPayment } from '../lib/rpc';
 import { supabase } from '../lib/supabase';
 import { openWhatsApp } from '../lib/whatsapp';
 import { issueInvoice, issueReceipt } from '../lib/documents';
@@ -176,14 +176,15 @@ export const NewSale: React.FC = () => {
   const handleConfirmSale = async () => {
     setSubmitting(true);
     try {
-      let customerId = 'mock-cust-1';
-      const { data: custData } = await supabase
-        .from('customers')
-        .insert({ full_name: customerName, phone: customerPhone, address: customerAddress })
-        .select()
-        .single();
-      
-      if (custData) customerId = custData.id;
+      const nameParts = customerName.trim().split(/\s+/);
+      const customer = await createCustomer({
+        first_name: nameParts[0] ?? '',
+        last_name: nameParts.slice(1).join(' ') || undefined,
+        phone: customerPhone,
+        address: customerAddress || undefined,
+      }) as { customer_id?: string };
+      const customerId = customer.customer_id;
+      if (!customerId) throw new Error('Customer creation did not return an ID');
 
       const { data: saleData, error: saleError } = await supabase.rpc('fn_create_sale', {
         p_customer_id: customerId,

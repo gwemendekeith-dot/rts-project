@@ -8,9 +8,14 @@ export function hydrateTemplate(template: string, data: Record<string, string>):
 
 // Send hydrated HTML to the Vercel render function; get PDF bytes back.
 export async function renderPdf(html: string): Promise<Blob> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error('You must be signed in to render a PDF');
   const res = await fetch('/api/render-pdf', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
     body: JSON.stringify({ html }),
   });
   if (!res.ok) throw new Error(`PDF render failed (${res.status})`);
@@ -30,9 +35,12 @@ export async function uploadPdfToStorage(path: string, blob: Blob): Promise<stri
 // Build a table row for a sale item (serial shown only for serialised units).
 export function lineItemRow(i: { description: string; serial: string | null;
                                  qty: number; unitPrice: number; lineTotal: number }): string {
-  const serial = i.serial ? `<span class="serial">${i.serial}</span>` : '-';
+  const escapeHtml = (value: string) => value.replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[character] ?? character));
+  const serial = i.serial ? `<span class="serial">${escapeHtml(i.serial)}</span>` : '-';
   return `<tr>
-    <td>${i.description}</td><td>${serial}</td>
+    <td>${escapeHtml(i.description)}</td><td>${serial}</td>
     <td class="r">${i.qty}</td>
     <td class="r">$${i.unitPrice.toFixed(2)}</td>
     <td class="r">$${i.lineTotal.toFixed(2)}</td>

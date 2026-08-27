@@ -1,20 +1,25 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import { AppShell } from './components/layout/AppShell';
-import { Login } from './pages/Login';
-import { Dashboard } from './pages/Dashboard';
-import { NewSale } from './pages/NewSale';
-import { SaleWorkspace } from './pages/SaleWorkspace';
-import { Inventory } from './pages/Inventory';
-import { Installations } from './pages/Installations';
-import { InstallationDetail } from './pages/InstallationDetail';
-import { Customers } from './pages/Customers';
-import { Customer360 } from './pages/Customer360';
-import { Warranties } from './pages/Warranties';
-import { Documents } from './pages/Documents';
-import { Reports } from './pages/Reports';
 import { OfflineBanner, ReconnectedToast, InstallPrompt } from './components/ui/InstallPrompt';
+
+const Login = lazy(() => import('./pages/Login').then(module => ({ default: module.Login })));
+const Dashboard = lazy(() => import('./pages/Dashboard').then(module => ({ default: module.Dashboard })));
+const NewSale = lazy(() => import('./pages/NewSale').then(module => ({ default: module.NewSale })));
+const SaleWorkspace = lazy(() => import('./pages/SaleWorkspace').then(module => ({ default: module.SaleWorkspace })));
+const Inventory = lazy(() => import('./pages/Inventory').then(module => ({ default: module.Inventory })));
+const Installations = lazy(() => import('./pages/Installations').then(module => ({ default: module.Installations })));
+const InstallationDetail = lazy(() => import('./pages/InstallationDetail').then(module => ({ default: module.InstallationDetail })));
+const Customers = lazy(() => import('./pages/Customers').then(module => ({ default: module.Customers })));
+const Customer360 = lazy(() => import('./pages/Customer360').then(module => ({ default: module.Customer360 })));
+const Warranties = lazy(() => import('./pages/Warranties').then(module => ({ default: module.Warranties })));
+const Documents = lazy(() => import('./pages/Documents').then(module => ({ default: module.Documents })));
+const Reports = lazy(() => import('./pages/Reports').then(module => ({ default: module.Reports })));
+
+function PageLoading() {
+  return <div className="p-10 text-center text-slate-400">Loading page...</div>;
+}
 
 const ProtectedLayout: React.FC = () => {
   const { isAuthenticated, loading } = useAuth();
@@ -65,10 +70,12 @@ export const App: React.FC = () => {
       <OfflineBanner />
       <ReconnectedToast />
       <InstallPrompt />
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/*" element={<ProtectedLayout />} />
-      </Routes>
+      <Suspense fallback={<PageLoading />}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/*" element={<ProtectedLayout />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 };

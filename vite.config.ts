@@ -17,13 +17,12 @@ export default defineConfig({
           {
             // Supabase REST API — NetworkFirst so the UI is always fresh when online,
             // but falls back to cached responses when offline (reads work, writes queue).
-            urlPattern: /^https:\/\/.*\.supabase\.co\/(rest|storage)\/.*/i,
+              urlPattern: /^https:\/\/.*\.supabase\.co\/.*$/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'supabase-api-cache',
-              networkTimeoutSeconds: 6,
               expiration: {
-                maxEntries: 200,
+                  maxEntries: 50,
                 maxAgeSeconds: 60 * 60 * 24, // 24 hours
               },
               cacheableResponse: {
@@ -54,9 +53,9 @@ export default defineConfig({
       manifest: {
         name: 'Rafiki Operations Desk',
         short_name: 'Rafiki Ops',
-        description: 'Rafiki Thermal Solutions — Field Operations & CRM',
+          description: 'Operational source of truth for Rafiki Thermal Solutions',
         theme_color: '#0f172a',
-        background_color: '#020617',
+          background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait-primary',
         start_url: '/',

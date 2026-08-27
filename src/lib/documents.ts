@@ -13,7 +13,7 @@ const fmtDate = (date: string | Date) =>
 
 type SaleItemRecord = {
   quantity: number;
-  unit_price_usd: number;
+  unit_price: number;
   products?: { name: string } | null;
   serial_numbers?: { serial_number: string } | null;
 };
@@ -23,18 +23,18 @@ type SaleRecord = {
   sale_date?: string;
   created_at: string;
   payment_status: string;
-  total_amount_usd: number;
-  paid_amount_usd: number;
-  balance_due_usd: number;
+  total_amount: number;
+  amount_paid: number;
+  balance_due: number;
   customers: { full_name: string; phone: string; address: string | null };
   sale_items: SaleItemRecord[];
 };
 
 type PaymentRecord = {
-  created_at: string;
-  amount_usd: number;
+  payment_date: string;
+  amount: number;
   payment_method: string;
-  reference_code: string | null;
+  payment_reference: string | null;
 };
 
 type WarrantyRecord = {
@@ -57,12 +57,13 @@ type IssuedDocument = { id: string; document_number: string };
 async function baseSettings(): Promise<Record<string, string>> {
   const { data, error } = await supabase
     .from('system_settings')
-    .select('whatsapp_number, location')
-    .single();
+    .select('key, value')
+    .in('key', ['whatsapp_number', 'location']);
   if (error) throw error;
+  const values = Object.fromEntries((data ?? []).map(row => [row.key, row.value]));
   return {
-    WHATSAPP: data.whatsapp_number,
-    LOCATION: data.location,
+    WHATSAPP: values.whatsapp_number ?? '',
+    LOCATION: values.location ?? '',
   };
 }
 
@@ -109,7 +110,7 @@ async function linkDocument(documentId: string, path: string): Promise<void> {
 
 function saleRows(items: SaleItemRecord[]): string {
   return items.map((item) => {
-    const unitPrice = Number(item.unit_price_usd);
+    const unitPrice = Number(item.unit_price);
     const quantity = Number(item.quantity);
     return lineItemRow({
       description: item.products?.name ?? 'Sale item',
@@ -138,14 +139,14 @@ export async function issueReceipt(saleId: string, paymentId: string): Promise<s
   const html = hydrateTemplate(receiptTpl, {
     ...settings,
     DOCUMENT_NUMBER: document.document_number,
-    ISSUE_DATE: fmtDate(paymentRecord.created_at),
+    ISSUE_DATE: fmtDate(paymentRecord.payment_date),
     PAYMENT_METHOD: paymentRecord.payment_method.replace(/_/g, ' '),
-    PAYMENT_REFERENCE: paymentRecord.reference_code ?? '-',
+    PAYMENT_REFERENCE: paymentRecord.payment_reference ?? '-',
     PAYMENT_STATUS: sale.payment_status.replace(/_/g, ' '),
     CUSTOMER_NAME: sale.customers.full_name,
     LINE_ITEMS_ROWS: saleRows(sale.sale_items),
-    SUBTOTAL: Number(sale.total_amount_usd).toFixed(2),
-    TOTAL_PAID: Number(paymentRecord.amount_usd).toFixed(2),
+    SUBTOTAL: Number(sale.total_amount).toFixed(2),
+    TOTAL_PAID: Number(paymentRecord.amount).toFixed(2),
   });
   const path = `receipts/${document.document_number}.pdf`;
   const url = await uploadPdfToStorage(path, await renderPdf(html));
@@ -166,9 +167,9 @@ export async function issueInvoice(saleId: string): Promise<string> {
     CUSTOMER_PHONE: sale.customers.phone,
     CUSTOMER_ADDRESS: sale.customers.address ?? '',
     LINE_ITEMS_ROWS: saleRows(sale.sale_items),
-    SUBTOTAL: Number(sale.total_amount_usd).toFixed(2),
-    AMOUNT_PAID: Number(sale.paid_amount_usd).toFixed(2),
-    BALANCE_DUE: Number(sale.balance_due_usd).toFixed(2),
+    SUBTOTAL: Number(sale.total_amount).toFixed(2),
+    AMOUNT_PAID: Number(sale.amount_paid).toFixed(2),
+    BALANCE_DUE: Number(sale.balance_due).toFixed(2),
   });
   const path = `invoices/${document.document_number}.pdf`;
   const url = await uploadPdfToStorage(path, await renderPdf(html));

@@ -7,6 +7,14 @@ Format: `[YYYY-MM-DD] vX.X — Category — Description`
 
 ## [2026-08-27] — Deployment Fixes
 
+### v0.22.0 — Reporting, Offline Drafts & Bundle Splitting
+**Files:** `src/lib/xlsx.ts`, `src/pages/Reports.tsx`, `src/hooks/useOfflineDraft.ts`, `src/App.tsx`, `vite.config.ts`, `package.json`
+- Replaced the Reports page's mock export data with a live five-tab XLSX tracker sourced from Supabase
+- Added a generic localStorage-backed `useOfflineDraft<T>` hook with safe load, save, and clear behavior
+- Updated the PWA manifest and Supabase runtime caching configuration
+- Lazy-loaded route pages with React `Suspense` to remove the production chunk-size warning
+- Added `workbox-window` alongside the existing `xlsx` and `vite-plugin-pwa` dependencies
+
 ### v0.21.0 — Vercel Deployment & Supabase Configuration
 **Files:** `api/render-pdf.ts`, `src/lib/supabase.ts`, `README.md`
 - Updated the Vercel PDF API function runtime from obsolete `nodejs18.x` to supported `nodejs`
