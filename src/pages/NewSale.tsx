@@ -26,7 +26,7 @@ interface ProductItem {
   id: string;
   sku: string;
   name: string;
-  selling_price_usd: number;
+  selling_price: number;
 }
 
 interface SerialItem {
@@ -39,7 +39,7 @@ interface SaleLineItem {
   product_id: string;
   sku: string;
   name: string;
-  unit_price_usd: number;
+  unit_price: number;
   quantity: number;
   serial_number_id?: string;
   is_preorder: boolean;
@@ -76,7 +76,7 @@ export const NewSale: React.FC = () => {
   // Section 5: Confirmation Modal & Success State
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [completedDoc, setCompletedDoc] = useState<{ inv: string; invoiceUrl: string; rcp?: string } | null>(null);
+  const [completedDoc, setCompletedDoc] = useState<{ inv: string; invoiceUrl?: string; rcp?: string } | null>(null);
 
   // ── Restore draft on mount ──────────────────────────────────────────────────
   useEffect(() => {
@@ -125,30 +125,18 @@ export const NewSale: React.FC = () => {
   // ── Load catalog ────────────────────────────────────────────────────────────
   useEffect(() => {
     async function loadCatalog() {
-      try {
-        const { data: prodData } = await supabase.from('products').select('*').eq('active', true);
-        if (prodData) setProducts(prodData);
+      const { data: prodData, error: prodError } = await supabase.from('products').select('*').eq('active', true);
+      if (prodError) throw new Error('Failed to load products from database');
+      if (prodData) setProducts(prodData);
 
-        const { data: serialData } = await supabase.from('serial_numbers').select('*').eq('status', 'AVAILABLE');
-        if (serialData) setAvailableSerials(serialData);
-      } catch {
-        // Fallback mock catalog
-        setProducts([
-          { id: '1', sku: 'GH-12L', name: '12L Gas Geyser', selling_price_usd: 150 },
-          { id: '2', sku: 'GH-16L', name: '16L Gas Geyser', selling_price_usd: 220 },
-          { id: '3', sku: 'GH-20L', name: '20L Gas Geyser', selling_price_usd: 280 },
-          { id: '4', sku: 'SVC-INSTALL', name: 'Installation Labour', selling_price_usd: 70 },
-        ]);
-        setAvailableSerials([
-          { id: 's1', serial_number: 'GH-12L-001', product_id: '1' },
-          { id: 's2', serial_number: 'GH-16L-001', product_id: '2' },
-        ]);
-      }
+      const { data: serialData, error: serialError } = await supabase.from('serial_numbers').select('*').eq('status', 'AVAILABLE');
+      if (serialError) throw new Error('Failed to load serial numbers from database');
+      if (serialData) setAvailableSerials(serialData);
     }
     loadCatalog();
   }, []);
 
-  const itemsSubtotal = lineItems.reduce((acc, item) => acc + (item.unit_price_usd * item.quantity), 0);
+  const itemsSubtotal = lineItems.reduce((acc, item) => acc + (item.unit_price * item.quantity), 0);
   const installFee = includeInstallation ? 70.00 : 0.00;
   const grandTotal = itemsSubtotal + installFee + Number(partsAmount || 0);
   const balanceDue = grandTotal - amountPaidNow;
@@ -162,7 +150,7 @@ export const NewSale: React.FC = () => {
       product_id: prod.id,
       sku: prod.sku,
       name: prod.name,
-      unit_price_usd: prod.selling_price_usd,
+      unit_price: prod.selling_price,
       quantity: 1,
       serial_number_id: isPreorder ? undefined : selectedSerialId || undefined,
       is_preorder: isPreorder
@@ -193,7 +181,7 @@ export const NewSale: React.FC = () => {
         p_items: lineItems.map(item => ({
           product_id: item.product_id,
           quantity: item.quantity,
-          unit_price: item.unit_price_usd,
+          unit_price: item.unit_price,
           discount: 0,
           serial_number_id: item.serial_number_id || null,
         })),
@@ -203,26 +191,49 @@ export const NewSale: React.FC = () => {
       if (!saleId) throw new Error('Sale creation did not return an ID');
 
       let rcpNum: string | undefined;
-      if (amountPaidNow > 0) {
-        const payRes = await recordPayment({
-          sale_id: saleId,
-          amount_usd: amountPaidNow,
-          payment_method: paymentMethod,
-          reference_code: paymentReference,
-          recorded_by: saleId,
-        }) as { receipt_number?: string };
+      let invoiceUrl: string | undefined;
+      let docErrors: string[] = [];
 
-        const { data: latestPayment } = await supabase.from('payments')
-          .select('id').eq('sale_id', saleId).order('payment_date', { ascending: false }).limit(1).single();
-        if (latestPayment) await issueReceipt(saleId, latestPayment.id);
-        rcpNum = payRes?.receipt_number;
+      if (amountPaidNow > 0) {
+        try {
+          const payRes = await recordPayment({
+            sale_id: saleId,
+            amount_usd: amountPaidNow,
+            payment_method: paymentMethod,
+            reference_code: paymentReference,
+            recorded_by: saleId,
+          }) as { receipt_number?: string };
+
+          const { data: latestPayment } = await supabase.from('payments')
+            .select('id').eq('sale_id', saleId).order('payment_date', { ascending: false }).limit(1).single();
+          if (latestPayment) {
+            try {
+              await issueReceipt(saleId, latestPayment.id);
+            } catch (docError) {
+              docErrors.push('Receipt generation failed');
+              console.error('Receipt issuance error:', docError);
+            }
+          }
+          rcpNum = payRes?.receipt_number;
+        } catch (payError) {
+          throw new Error(`Payment failed: ${payError instanceof Error ? payError.message : String(payError)}`);
+        }
       }
 
-      const invoiceUrl = await issueInvoice(saleId);
+      try {
+        invoiceUrl = await issueInvoice(saleId);
+      } catch (docError) {
+        docErrors.push('Invoice generation failed');
+        console.error('Invoice issuance error:', docError);
+      }
 
       await clearDraft(); // Delete draft on successful submission
       setCompletedDoc({ inv: String(saleData?.sale_number ?? saleId), invoiceUrl, rcp: rcpNum });
       setShowConfirmModal(false);
+
+      if (docErrors.length > 0) {
+        alert(`Sale created successfully (Sale #${saleData?.sale_number}), but document generation failed: ${docErrors.join(', ')}. You can re-issue documents from the sale workspace.`);
+      }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       alert(`Could not complete sale: ${message}`);
@@ -378,7 +389,7 @@ export const NewSale: React.FC = () => {
               >
                 <option value="">-- Choose Unit --</option>
                 {products.filter(p => p.sku.startsWith('GH')).map(p => (
-                  <option key={p.id} value={p.id}>{p.sku} ({p.name}) - ${p.selling_price_usd}</option>
+                  <option key={p.id} value={p.id}>{p.sku} ({p.name}) - ${p.selling_price}</option>
                 ))}
               </select>
             </div>
@@ -436,7 +447,7 @@ export const NewSale: React.FC = () => {
                       )}
                     </div>
                   </div>
-                  <span className="font-mono font-bold text-white">${item.unit_price_usd.toFixed(2)}</span>
+                  <span className="font-mono font-bold text-white">${item.unit_price.toFixed(2)}</span>
                 </div>
               ))}
             </div>

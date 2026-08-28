@@ -14,7 +14,7 @@ export function useRole() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('active_role, full_name')
+        .select('active_role')
         .eq('id', user!.id)
         .single();
       if (error) throw error;
@@ -47,7 +47,7 @@ export function useRole() {
     activeRole,
     switchRole,
     heldRoles: rolesQuery.data ?? [],
-    fullName: profileQuery.data?.full_name,
+    fullName: null, // full_name field removed from profiles table
     isOwner: activeRole === 'OWNER',
     isSales: activeRole === 'SALES',
     isOperations: activeRole === 'OPERATIONS',

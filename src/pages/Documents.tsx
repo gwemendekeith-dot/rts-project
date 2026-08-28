@@ -41,7 +41,7 @@ export const Documents: React.FC = () => {
     {
       id: 'doc-3',
       doc_number: 'RTS-WTY-2026-0002',
-      doc_type: 'WARRANTY',
+      doc_type: 'WARRANTY_CERTIFICATE',
       created_at: '2026-08-26 16:30',
       pdf_url: 'https://placeholder.supabase.co/storage/v1/object/public/documents/warrantys/RTS-WTY-2026-0002.pdf',
       is_void: false,

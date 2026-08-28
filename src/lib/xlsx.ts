@@ -2,7 +2,8 @@ import * as XLSX from 'xlsx';
 import { supabase } from './supabase';
 
 type Customer = {
-  full_name: string;
+  first_name: string;
+  last_name: string | null;
   phone: string;
   address: string | null;
 };
@@ -69,7 +70,7 @@ type WarrantyRow = {
 const dateOnly = (value: string | null | undefined) =>
   value ? new Date(value).toISOString().slice(0, 10) : '';
 
-const customerName = (customer: Customer | null) => customer?.full_name ?? '';
+const customerName = (customer: Customer | null) => customer ? `${customer.first_name} ${customer.last_name || ''}`.trim() : '';
 
 export async function exportOperationsTracker(): Promise<void> {
   const results = await Promise.all([

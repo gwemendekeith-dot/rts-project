@@ -26,7 +26,7 @@ type SaleRecord = {
   total_amount: number;
   amount_paid: number;
   balance_due: number;
-  customers: { full_name: string; phone: string; address: string | null };
+  customers: { first_name: string; last_name: string | null; phone: string; address: string | null };
   sale_items: SaleItemRecord[];
 };
 
@@ -47,7 +47,7 @@ type WarrantyRecord = {
     serial_number: string;
     products: { name: string } | null;
   };
-  customers: { full_name: string };
+  customers: { first_name: string; last_name: string | null };
   start_date: string;
   expiry_date: string;
 };
@@ -143,7 +143,7 @@ export async function issueReceipt(saleId: string, paymentId: string): Promise<s
     PAYMENT_METHOD: paymentRecord.payment_method.replace(/_/g, ' '),
     PAYMENT_REFERENCE: paymentRecord.payment_reference ?? '-',
     PAYMENT_STATUS: sale.payment_status.replace(/_/g, ' '),
-    CUSTOMER_NAME: sale.customers.full_name,
+    CUSTOMER_NAME: `${sale.customers.first_name} ${sale.customers.last_name || ''}`.trim(),
     LINE_ITEMS_ROWS: saleRows(sale.sale_items),
     SUBTOTAL: Number(sale.total_amount).toFixed(2),
     TOTAL_PAID: Number(paymentRecord.amount).toFixed(2),
@@ -163,7 +163,7 @@ export async function issueInvoice(saleId: string): Promise<string> {
     ...settings,
     DOCUMENT_NUMBER: document.document_number,
     ISSUE_DATE: fmtDate(sale.sale_date ?? sale.created_at),
-    CUSTOMER_NAME: sale.customers.full_name,
+    CUSTOMER_NAME: `${sale.customers.first_name} ${sale.customers.last_name || ''}`.trim(),
     CUSTOMER_PHONE: sale.customers.phone,
     CUSTOMER_ADDRESS: sale.customers.address ?? '',
     LINE_ITEMS_ROWS: saleRows(sale.sale_items),
@@ -200,7 +200,7 @@ export async function issueWarrantyCertificate(installationId: string): Promise<
     WARRANTY_NUMBER: document.document_number,
     SERIAL_NUMBER: warranty.serial_numbers.serial_number,
     PRODUCT_MODEL: warranty.serial_numbers.products?.name ?? '',
-    CUSTOMER_NAME: warranty.customers.full_name,
+    CUSTOMER_NAME: `${warranty.customers.first_name} ${warranty.customers.last_name || ''}`.trim(),
     START_DATE: fmtDate(warranty.start_date),
     EXPIRY_DATE: fmtDate(warranty.expiry_date),
   });

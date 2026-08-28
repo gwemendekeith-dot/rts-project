@@ -10,12 +10,12 @@ export type UserRoleEnum = 'OWNER' | 'SALES' | 'OPERATIONS';
 export type EnquiryStatusEnum = 'NEW' | 'CONTACTED' | 'QUOTED' | 'WON' | 'LOST';
 export type QuoteStatusEnum = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
 export type SaleStatusEnum = 'PENDING' | 'CONFIRMED' | 'SCHEDULED' | 'INSTALLED' | 'COMPLETED' | 'CANCELLED' | 'REFUNDED';
-export type PaymentStatusEnum = 'UNPAID' | 'PARTIAL' | 'PAID' | 'REFUNDED';
+export type PaymentStatusEnum = 'UNPAID' | 'PARTIAL' | 'PAID' | 'OVERPAID' | 'REFUND_DUE' | 'REFUNDED' | 'PARTIALLY_REFUNDED';
 export type PaymentMethodEnum = 'CASH' | 'BANK_TRANSFER' | 'CARD' | 'ECOCASH';
-export type SerialStatusEnum = 'AVAILABLE' | 'RESERVED' | 'ALLOCATED' | 'INSTALLED' | 'DEFECTIVE' | 'WRITTEN_OFF';
-export type InstallStatusEnum = 'UNSCHEDULED' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type SerialStatusEnum = 'AVAILABLE' | 'RESERVED' | 'ALLOCATED' | 'INSTALLED' | 'RETURNED' | 'DAMAGED' | 'SCRAPPED';
+export type InstallStatusEnum = 'PENDING' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export type WarrantyStatusEnum = 'ACTIVE' | 'EXPIRED' | 'CLAIMED' | 'VOID';
-export type DocTypeEnum = 'QUOTE' | 'INVOICE' | 'RECEIPT' | 'WARRANTY' | 'INSTALLATION_CERT';
+export type DocTypeEnum = 'QUOTE' | 'INVOICE' | 'RECEIPT' | 'WARRANTY_CERTIFICATE' | 'INSTALLATION_REPORT';
 export type CashTypeEnum = 'SALE_PAYMENT' | 'INSTALLER_PAYOUT' | 'REFERRAL_PAYOUT' | 'REFUND' | 'EXPENSE' | 'DEPOSIT';
 
 export interface Database {
@@ -23,41 +23,36 @@ export interface Database {
     Tables: {
       system_settings: {
         Row: {
-          id: number;
-          company_name: string;
-          tagline: string;
-          whatsapp_number: string;
-          location: string;
-          currency: string;
-          timezone: string;
-          ecocash_enabled: boolean;
-          vat_registered: boolean;
-          vat_disclaimer: string;
+          key: string;
+          value: string;
+          value_type: string;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['system_settings']['Row'], 'id' | 'updated_at'>;
+        Insert: Omit<Database['public']['Tables']['system_settings']['Row'], 'updated_at'>;
         Update: Partial<Database['public']['Tables']['system_settings']['Insert']>;
       };
       warranty_terms: {
         Row: {
-          id: string;
-          duration_months: number;
-          terms_text: string;
-          created_at: string;
+          version: string;
+          clause_warranty: string;
+          clause_liability: string;
+          clause_returns: string;
+          clause_handover: string;
+          effective_date: string;
+          is_active: boolean;
         };
-        Insert: Omit<Database['public']['Tables']['warranty_terms']['Row'], 'id' | 'created_at'>;
+        Insert: Omit<Database['public']['Tables']['warranty_terms']['Row'], 'version'>;
         Update: Partial<Database['public']['Tables']['warranty_terms']['Insert']>;
       };
       profiles: {
         Row: {
           id: string;
-          email: string;
-          full_name: string;
           active_role: UserRoleEnum;
+          full_name: string | null;
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at' | 'updated_at'>;
+        Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>;
       };
       user_roles: {
@@ -73,34 +68,42 @@ export interface Database {
       customers: {
         Row: {
           id: string;
-          full_name: string;
+          customer_number: string;
+          customer_type: string;
+          first_name: string;
+          last_name: string | null;
           phone: string;
           email: string | null;
           address: string | null;
+          city: string | null;
+          referral_source: string | null;
           notes: string | null;
+          status: string;
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['customers']['Row'], 'id' | 'created_at' | 'updated_at'>;
+        Insert: Omit<Database['public']['Tables']['customers']['Row'], 'id' | 'customer_number' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['customers']['Insert']>;
       };
       installers: {
         Row: {
           id: string;
-          full_name: string;
+          installer_number: string;
+          name: string;
           phone: string;
-          is_active: boolean;
+          rate_per_install: number;
+          status: string;
           created_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['installers']['Row'], 'id' | 'created_at'>;
+        Insert: Omit<Database['public']['Tables']['installers']['Row'], 'id' | 'installer_number' | 'created_at'>;
         Update: Partial<Database['public']['Tables']['installers']['Insert']>;
       };
       referral_partners: {
         Row: {
           id: string;
-          full_name: string;
+          name: string;
           phone: string;
-          commission_rate_usd: number;
+          commission_rate: number | null;
           created_at: string;
         };
         Insert: Omit<Database['public']['Tables']['referral_partners']['Row'], 'id' | 'created_at'>;
@@ -111,10 +114,14 @@ export interface Database {
           id: string;
           sku: string;
           name: string;
-          capacity_litres: number | null;
-          selling_price_usd: number;
-          cost_price_usd: number;
-          is_active: boolean;
+          category: string;
+          description: string | null;
+          cost_price: number | null;
+          selling_price: number;
+          warranty_months: number;
+          requires_serial: boolean;
+          requires_installation: boolean;
+          active: boolean;
           created_at: string;
         };
         Insert: Omit<Database['public']['Tables']['products']['Row'], 'id' | 'created_at'>;
@@ -126,10 +133,19 @@ export interface Database {
           serial_number: string;
           product_id: string;
           status: SerialStatusEnum;
-          received_at: string;
-          notes: string | null;
+          received_date: string | null;
+          receiving_photo_ref: string | null;
+          qc_status: string | null;
+          qc_notes: string | null;
+          sale_id: string | null;
+          customer_id: string | null;
+          installation_id: string | null;
+          sold_date: string | null;
+          installed_date: string | null;
+          created_at: string;
+          updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['serial_numbers']['Row'], 'id' | 'received_at'>;
+        Insert: Omit<Database['public']['Tables']['serial_numbers']['Row'], 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['serial_numbers']['Insert']>;
       };
       enquiries: {
@@ -150,13 +166,16 @@ export interface Database {
           quote_number: string;
           customer_id: string;
           status: QuoteStatusEnum;
-          subtotal_usd: number;
-          install_labour_usd: number;
-          total_usd: number;
-          valid_until: string;
+          subtotal: number;
+          discount: number;
+          total_amount: number;
+          valid_until: string | null;
+          notes: string | null;
+          created_by: string | null;
           created_at: string;
+          updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['quotes']['Row'], 'id' | 'created_at'>;
+        Insert: Omit<Database['public']['Tables']['quotes']['Row'], 'id' | 'quote_number' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['quotes']['Insert']>;
       };
       quote_items: {
@@ -164,8 +183,11 @@ export interface Database {
           id: string;
           quote_id: string;
           product_id: string;
+          description: string;
           quantity: number;
-          unit_price_usd: number;
+          unit_price: number;
+          discount: number;
+          line_total: number;
         };
         Insert: Omit<Database['public']['Tables']['quote_items']['Row'], 'id'>;
         Update: Partial<Database['public']['Tables']['quote_items']['Insert']>;
@@ -174,19 +196,25 @@ export interface Database {
         Row: {
           id: string;
           sale_number: string;
-          quote_id: string | null;
           customer_id: string;
+          quote_id: string | null;
           referral_partner_id: string | null;
-          sale_status: SaleStatusEnum;
+          referral_source: string | null;
+          sale_date: string;
+          subtotal: number;
+          discount: number;
+          total_amount: number;
+          amount_paid: number;
+          balance_due: number;
           payment_status: PaymentStatusEnum;
-          total_amount_usd: number;
-          paid_amount_usd: number;
-          balance_due_usd: number;
+          fulfilment_status: string;
+          is_preorder: boolean;
           notes: string | null;
+          created_by: string | null;
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['sales']['Row'], 'id' | 'balance_due_usd' | 'created_at' | 'updated_at'>;
+        Insert: Omit<Database['public']['Tables']['sales']['Row'], 'id' | 'sale_number' | 'sale_date' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['sales']['Insert']>;
       };
       sale_items: {
@@ -194,9 +222,12 @@ export interface Database {
           id: string;
           sale_id: string;
           product_id: string;
-          serial_number_id: string | null;
-          unit_price_usd: number;
+          description: string;
           quantity: number;
+          unit_price: number;
+          discount: number;
+          line_total: number;
+          serial_number_id: string | null;
         };
         Insert: Omit<Database['public']['Tables']['sale_items']['Row'], 'id'>;
         Update: Partial<Database['public']['Tables']['sale_items']['Insert']>;
@@ -204,27 +235,34 @@ export interface Database {
       payments: {
         Row: {
           id: string;
-          receipt_number: string;
+          payment_number: string;
           sale_id: string;
-          amount_usd: number;
+          payment_date: string;
+          amount: number;
           payment_method: PaymentMethodEnum;
-          reference_code: string | null;
-          recorded_by: string;
+          payment_reference: string | null;
+          status: string;
+          created_by: string | null;
           created_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['payments']['Row'], 'id' | 'created_at'>;
+        Insert: Omit<Database['public']['Tables']['payments']['Row'], 'id' | 'payment_number' | 'payment_date' | 'created_at'>;
         Update: Partial<Database['public']['Tables']['payments']['Insert']>;
       };
       refunds: {
         Row: {
           id: string;
+          refund_number: string;
+          payment_id: string;
           sale_id: string;
-          amount_usd: number;
+          amount: number;
+          method: string;
           reason: string;
-          approved_by: string;
+          status: string;
+          processed_by: string | null;
+          processed_at: string | null;
           created_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['refunds']['Row'], 'id' | 'created_at'>;
+        Insert: Omit<Database['public']['Tables']['refunds']['Row'], 'id' | 'refund_number' | 'created_at'>;
         Update: Partial<Database['public']['Tables']['refunds']['Insert']>;
       };
       installations: {
@@ -233,26 +271,32 @@ export interface Database {
           job_number: string;
           sale_id: string;
           installer_id: string | null;
-          status: InstallStatusEnum;
+          address: string;
           scheduled_date: string | null;
-          scheduled_time_slot: string | null;
-          labour_fee_usd: number;
-          installer_pay_usd: number;
-          company_cut_usd: number;
+          status: InstallStatusEnum;
+          gas_test: boolean | null;
+          water_test: boolean | null;
+          unit_test: boolean | null;
+          customer_handover: boolean | null;
+          signature_ref: string | null;
+          photo_refs: string[] | null;
+          installer_notes: string | null;
           completed_at: string | null;
-          notes: string | null;
           created_at: string;
+          updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['installations']['Row'], 'id' | 'created_at'>;
+        Insert: Omit<Database['public']['Tables']['installations']['Row'], 'id' | 'job_number' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['installations']['Insert']>;
       };
       installation_parts: {
         Row: {
           id: string;
           installation_id: string;
-          part_name: string;
-          cost_usd: number;
-          billed_usd: number;
+          product_id: string | null;
+          description: string;
+          quantity: number;
+          unit_cost: number;
+          total_cost: number;
         };
         Insert: Omit<Database['public']['Tables']['installation_parts']['Row'], 'id'>;
         Update: Partial<Database['public']['Tables']['installation_parts']['Insert']>;
@@ -266,19 +310,23 @@ export interface Database {
           serial_number_id: string;
           customer_id: string;
           status: WarrantyStatusEnum;
+          terms_version: string;
+          duration_months: number;
           start_date: string;
           expiry_date: string;
+          service_notes: string | null;
           created_at: string;
+          updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['warranties']['Row'], 'id' | 'created_at'>;
+        Insert: Omit<Database['public']['Tables']['warranties']['Row'], 'id' | 'warranty_number' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['warranties']['Insert']>;
       };
       inventory: {
         Row: {
           product_id: string;
-          available_qty: number;
-          reserved_qty: number;
-          installed_qty: number;
+          quantity_on_hand: number;
+          quantity_reserved: number;
+          quantity_available: number;
           updated_at: string;
         };
         Insert: Omit<Database['public']['Tables']['inventory']['Row'], 'updated_at'>;
@@ -291,7 +339,11 @@ export interface Database {
           serial_number_id: string | null;
           movement_type: string;
           quantity: number;
-          reference: string | null;
+          reference_type: string | null;
+          reference_id: string | null;
+          movement_date: string;
+          created_by: string | null;
+          notes: string | null;
           created_at: string;
         };
         Insert: Omit<Database['public']['Tables']['inventory_movements']['Row'], 'id' | 'created_at'>;
@@ -300,27 +352,28 @@ export interface Database {
       obligations: {
         Row: {
           id: string;
-          payee_type: string;
-          payee_id: string;
-          sale_id: string | null;
-          installation_id: string | null;
-          amount_usd: number;
-          is_settled: boolean;
-          settled_at: string | null;
+          obligation_number: string;
+          description: string;
+          total_amount: number;
+          amount_paid: number;
+          due_date: string;
+          status: string;
           created_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['obligations']['Row'], 'id' | 'created_at'>;
+        Insert: Omit<Database['public']['Tables']['obligations']['Row'], 'id' | 'obligation_number' | 'created_at'>;
         Update: Partial<Database['public']['Tables']['obligations']['Insert']>;
       };
       cash_movements: {
         Row: {
           id: string;
-          movement_type: CashTypeEnum;
-          amount_usd: number;
-          payment_method: PaymentMethodEnum;
-          reference_id: string | null;
-          notes: string | null;
-          recorded_by: string;
+          movement_date: string;
+          description: string;
+          category: string;
+          type: string;
+          amount: number;
+          source_type: string | null;
+          source_id: string | null;
+          created_by: string | null;
           created_at: string;
         };
         Insert: Omit<Database['public']['Tables']['cash_movements']['Row'], 'id' | 'created_at'>;
@@ -329,56 +382,71 @@ export interface Database {
       documents: {
         Row: {
           id: string;
-          doc_number: string;
-          doc_type: DocTypeEnum;
-          reference_id: string;
-          pdf_url: string | null;
-          is_void: boolean;
+          document_number: string;
+          document_type: DocTypeEnum;
+          customer_id: string;
+          sale_id: string | null;
+          payment_id: string | null;
+          quote_id: string | null;
+          installation_id: string | null;
+          warranty_id: string | null;
+          template_version: string;
+          status: string;
+          file_reference: string | null;
+          created_by: string | null;
           created_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['documents']['Row'], 'id' | 'created_at'>;
+        Insert: Omit<Database['public']['Tables']['documents']['Row'], 'id' | 'document_number' | 'created_at'>;
         Update: Partial<Database['public']['Tables']['documents']['Insert']>;
       };
       audit_logs: {
         Row: {
           id: string;
-          actor_id: string | null;
-          actor_role: UserRoleEnum;
+          user_id: string | null;
+          actor_role: string | null;
           action: string;
-          entity: string;
+          entity_type: string;
           entity_id: string | null;
-          details: Json | null;
-          created_at: string;
+          old_values: Json | null;
+          new_values: Json | null;
+          reason: string | null;
+          timestamp: string;
         };
-        Insert: Omit<Database['public']['Tables']['audit_logs']['Row'], 'id' | 'created_at'>;
+        Insert: Omit<Database['public']['Tables']['audit_logs']['Row'], 'id' | 'timestamp'>;
         Update: Partial<Database['public']['Tables']['audit_logs']['Insert']>;
       };
     };
     Views: {
       v_cash_position: {
         Row: {
-          total_collected_usd: number;
-          total_payouts_usd: number;
-          net_cash_usd: number;
+          id: string;
+          movement_date: string;
+          description: string;
+          category: string;
+          type: string;
+          amount: number;
+          source_type: string | null;
+          source_id: string | null;
+          created_by: string | null;
+          created_at: string;
+          running_balance: number;
         };
       };
       v_stock_dashboard: {
         Row: {
-          product_id: string;
           sku: string;
           name: string;
-          selling_price_usd: number;
-          available_units: number;
-          reserved_units: number;
-          installed_units: number;
+          quantity_on_hand: number;
+          quantity_reserved: number;
+          quantity_available: number;
+          days_of_stock_remaining: number | null;
+          restock_status: string;
         };
       };
       v_pipeline_summary: {
         Row: {
-          total_enquiries: number;
-          total_quotes: number;
-          total_sales: number;
-          pending_installations: number;
+          stage: string;
+          count: number;
         };
       };
       v_dashboard: {
