@@ -30,6 +30,12 @@ Format: `[YYYY-MM-DD] vX.X — Category — Description`
 - PDF renderer now uses the deployed Supabase URL/publishable key configuration fallback and returns the underlying failure detail to the operator instead of a generic 500.
 - New Sale confirmation and Sale Workspace now explain that installation jobs are created after the first confirmed payment; empty Installations now identifies this cause.
 
+## [2026-09-02] — Runtime Reliability
+
+- Updated the PDF renderer to Chromium 149/Puppeteer 25 and pinned the Vercel PDF function to Node 20 with sufficient memory for browser startup.
+- Removed service-worker caching for Supabase/Auth API responses, enabled cache cleanup, and configured Supabase session persistence/automatic token refresh.
+- React Query now refetches on focus/reconnect and retries transient failures, reducing stale pages and manual refreshes.
+
 
 ## [2026-09-02] — Runtime Issue Remediation
 

@@ -10,26 +10,13 @@ export default defineConfig({
       registerType: 'autoUpdate',
       // Generate the service worker via workbox
       workbox: {
+        cleanupOutdatedCaches: true,
         // Cache the app shell (HTML + JS + CSS) with a StaleWhileRevalidate strategy
         // so the app loads instantly offline and refreshes silently when online.
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2}'],
         runtimeCaching: [
-          {
-            // Supabase REST API — NetworkFirst so the UI is always fresh when online,
-            // but falls back to cached responses when offline (reads work, writes queue).
-              urlPattern: /^https:\/\/.*\.supabase\.co\/.*$/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'supabase-api-cache',
-              expiration: {
-                  maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24, // 24 hours
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-            },
-          },
+          // Supabase REST/Auth responses are intentionally not cached. Caching
+          // authenticated API data can show stale records or an old session.
           {
             // Google Fonts — CacheFirst, fonts don't change
             urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
