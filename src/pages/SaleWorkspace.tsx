@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
-import { issueRefund, recordPayment, voidDocument } from '../lib/rpc';
+import { cancelSale, issueRefund, recordPayment, voidDocument } from '../lib/rpc';
 import { issueReceipt } from '../lib/documents';
 import { openWhatsApp } from '../lib/whatsapp';
 import { useRole } from '../hooks/useRole';
@@ -34,6 +34,7 @@ export function SaleWorkspace() {
   const [refundPayment, setRefundPayment] = useState('');
   const [refundAmount, setRefundAmount] = useState(0);
   const [refundReason, setRefundReason] = useState('');
+  const [cancelReason, setCancelReason] = useState('');
 
   const saleQuery = useQuery({ queryKey: ['sale', saleId], enabled: Boolean(saleId), queryFn: async () => {
     const { data, error } = await supabase.from('sales').select('*, customers(*), sale_items(*, products(*), serial_numbers(*))').eq('id', saleId!).single();
@@ -86,6 +87,19 @@ export function SaleWorkspace() {
     finally { setBusy(false); }
   }
 
+  async function submitCancellation() {
+    const reason = cancelReason.trim();
+    if (!reason) return;
+    if (!confirm('Cancel this sale? All confirmed payments must already be fully refunded. The invoice will be voided and reserved stock released.')) return;
+    setBusy(true);
+    try {
+      await cancelSale({ sale_id: sale.id, reason });
+      setCancelReason('');
+      await queryClient.invalidateQueries();
+    } catch (error: unknown) { alert(error instanceof Error ? error.message : String(error)); }
+    finally { setBusy(false); }
+  }
+
   const tabs: Tab[] = ['overview', 'items', 'payments', 'installation', 'documents', 'audit'];
   return <div className="mx-auto max-w-5xl space-y-5">
     <header className="flex flex-wrap items-center justify-between gap-3">
@@ -94,6 +108,7 @@ export function SaleWorkspace() {
     </header>
     <nav className="flex gap-1 overflow-x-auto border-b border-slate-800">{tabs.map(item => <button key={item} onClick={() => setTab(item)} className={`px-4 py-2 text-xs font-semibold capitalize ${tab === item ? 'border-b-2 border-amber-400 text-white' : 'text-slate-400'}`}>{item}</button>)}</nav>
     {tab === 'overview' && <section className="grid gap-4 md:grid-cols-2"><Panel title="Financial"><Row label="Total" value={usd(sale.total_amount)} /><Row label="Paid" value={usd(sale.amount_paid)} /><Row label="Balance due" value={usd(sale.balance_due)} /><Row label="Payment status" value={sale.payment_status} /></Panel><Panel title="Customer"><Row label="Name" value={`${customer?.first_name ?? ''} ${customer?.last_name ?? ''}`} /><Row label="Phone" value={customer?.phone ?? '-'} /><Row label="Address" value={customer?.address ?? '-'} /><Row label="Referral" value={sale.referral_source ?? '-'} /></Panel></section>}
+    {isOwner && sale.fulfilment_status !== 'CANCELLED' && sale.fulfilment_status !== 'INSTALLED' && sale.fulfilment_status !== 'COMPLETED' && <Panel title="Owner Cancellation"><p className="mb-3 text-xs text-slate-400">Refund every confirmed payment first. Cancellation voids invoices and releases reserved stock.</p><div className="flex gap-2"><input value={cancelReason} onChange={event => setCancelReason(event.target.value)} placeholder="Cancellation reason" className="flex-1 rounded border p-2 text-slate-900" /><button disabled={busy || !cancelReason.trim()} onClick={submitCancellation} className="rounded bg-red-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">Cancel Sale</button></div></Panel>}
     {tab === 'items' && <Panel title="Purchased Items"><Table headers={['Item', 'Serial', 'Qty', 'Unit', 'Total']} rows={sale.sale_items.map(item => [item.products?.description ?? item.description, item.serial_numbers?.serial_number ?? '-', String(item.quantity), usd(item.unit_price), usd(item.line_total)])} /></Panel>}
     {tab === 'payments' && <Panel title="Payment Ledger"><div className="mb-4 flex justify-end"><button onClick={() => { setAmount(Math.max(Number(sale.balance_due), 0)); setPaymentOpen(true); }} className="rounded bg-amber-500 px-3 py-2 text-xs font-semibold text-slate-900">Record Payment</button></div><Table headers={['Receipt', 'Date', 'Method', 'Reference', 'Amount']} rows={(paymentsQuery.data ?? []).map(payment => [payment.payment_number, new Date(payment.payment_date).toLocaleString(), payment.payment_method, payment.payment_reference ?? '-', usd(payment.amount)])} /></Panel>}
     {tab === 'installation' && <Panel title="Installation"><Row label="Job" value={jobQuery.data?.job_number ?? 'Not created'} /><Row label="Status" value={jobQuery.data?.status ?? 'Not created'} /><Row label="Scheduled" value={jobQuery.data?.scheduled_date ?? 'Not scheduled'} /></Panel>}

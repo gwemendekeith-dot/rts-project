@@ -555,3 +555,20 @@ CALL fn_record_payment(<sale_id>, 100, 'CASH', 'REF-UNIQUE-001');
 - New Sale now reports the underlying document error details and will not display or share a receipt number unless receipt generation actually succeeds.
 - WhatsApp invoice sharing now refuses to send an `undefined` URL and uses the issued invoice document number.
 
+## Sale Cancellation Workflow — 2026-09-02
+
+- Added `0012_sale_cancellation.sql` with OWNER-only `fn_cancel_sale`.
+- Cancellation requires a non-empty reason and is rejected while any confirmed/partially-refunded payment has an outstanding amount.
+- On success, the single transaction releases RESERVED/ALLOCATED serials, cancels pending installation jobs, voids all non-void invoices, refreshes inventory, updates sale fulfilment status, and records `DOCUMENT_VOIDED`/`SALE_CANCELLED` audit events.
+- Completed or installed jobs are blocked with `INSTALLATION_COMPLETE_NO_CANCEL`; warranty handling remains the supported path after completion.
+- Sale Workspace now exposes an OWNER-only cancellation panel and clear error handling. Financial history is retained; direct deletion is not supported.
+- Verification: `npm run build` PASS. Migration still requires application and authenticated Supabase verification in the target project.
+
+## Navigation and Document Recovery — 2026-09-02
+
+- Fixed mobile sidebar state so selecting a navigation option collapses the menu automatically.
+- Replaced the `/sales` misroute (which rendered a sale detail page without an ID) with a live sales ledger; connected the previously placeholder enquiries, quotes, payments, and settings routes to their database tables.
+- Added the authenticated Vercel `/api/render-pdf` renderer required by document generation.
+- Added invoice PDF regeneration for records with a missing `file_reference`; viewing now uses a short-lived signed Storage URL and reports missing files instead of silently doing nothing.
+- Verification: `npm run build` PASS. Existing empty tables are reported as empty rather than treated as query failures.
+

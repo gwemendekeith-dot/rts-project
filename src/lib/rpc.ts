@@ -55,6 +55,11 @@ export interface SwitchRoleArgs {
   new_role: UserRoleEnum;
 }
 
+export interface CancelSaleArgs {
+  sale_id: string;
+  reason: string;
+}
+
 // 1. Record Payment
 export async function recordPayment(args: RecordPaymentArgs): Promise<Json> {
   const { data, error } = await supabase.rpc('fn_record_payment', {
@@ -150,6 +155,15 @@ export async function switchRole(args: SwitchRoleArgs): Promise<Json> {
     p_role: args.new_role,
   });
 
+  if (error) throw error;
+  return data;
+}
+
+export async function cancelSale(args: CancelSaleArgs): Promise<Json> {
+  const { data, error } = await supabase.rpc('fn_cancel_sale', {
+    p_sale_id: args.sale_id,
+    p_reason: args.reason,
+  });
   if (error) throw error;
   return data;
 }

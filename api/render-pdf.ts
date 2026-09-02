@@ -1,64 +1,39 @@
-// api/render-pdf.ts — runs on the Node runtime (NOT edge), so Puppeteer works.
 import chromium from '@sparticuz/chromium';
 import puppeteer from 'puppeteer-core';
+import { verifyAuth } from '@supabase/server/core';
 
-export const config = {
-  runtime: 'nodejs',
-  maxDuration: 60,
-};
+type VercelRequest = { method?: string; url?: string; headers: Record<string, string | string[] | undefined>; body?: unknown };
+type VercelResponse = { status: (code: number) => VercelResponse; json: (body: unknown) => void; send: (body: Buffer) => void; setHeader: (name: string, value: string) => void };
 
-type ApiRequest = {
-  method?: string;
-  headers: Record<string, string | string[] | undefined>;
-  body?: { html?: unknown };
-};
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
+  const authorization = typeof req.headers.authorization === 'string' ? req.headers.authorization : '';
+  const request = new Request(`https://${req.headers.host ?? 'localhost'}${req.url ?? '/api/render-pdf'}`, { headers: { authorization } });
+  const { error } = await verifyAuth(request, { auth: 'user' });
+  if (error) return res.status(error.status).json({ error: 'AUTHENTICATION_REQUIRED' });
 
-type ApiResponse = {
-  status: (code: number) => ApiResponse;
-  json: (body: unknown) => ApiResponse;
-  setHeader: (name: string, value: string | number) => void;
-  send: (body: Buffer) => ApiResponse;
-};
+  const html = typeof req.body === 'object' && req.body !== null && 'html' in req.body
+    ? String((req.body as { html: unknown }).html)
+    : '';
+  if (!html.trim()) return res.status(400).json({ error: 'HTML_REQUIRED' });
 
-async function authenticate(request: ApiRequest): Promise<boolean> {
-  const authorization = request.headers.authorization;
-  const token = Array.isArray(authorization) ? authorization[0] : authorization;
-  if (!token?.startsWith('Bearer ')) return false;
-  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-  const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.VITE_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !publishableKey) return false;
-  const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    headers: { apikey: publishableKey, Authorization: token },
-  });
-  return response.ok;
-}
-
-export default async function handler(req: ApiRequest, res: ApiResponse) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
-  if (!(await authenticate(req))) return res.status(401).json({ error: 'Authentication required' });
-  const html = typeof req.body?.html === 'string' ? req.body.html : '';
-  if (!html) return res.status(400).json({ error: 'Missing html' });
-  if (html.length > 1_000_000) return res.status(413).json({ error: 'HTML payload too large' });
-
-  const browser = await puppeteer.launch({
-    args: chromium.args,
-    defaultViewport: chromium.defaultViewport,
-    executablePath: await chromium.executablePath(),
-    headless: chromium.headless,
-  });
-
+  let browser: Awaited<ReturnType<typeof puppeteer.launch>> | undefined;
   try {
+    browser = await puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: { width: 1024, height: 768 },
+      executablePath: await chromium.executablePath(),
+      headless: true,
+    });
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
-    const pdf = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: { top: '12mm', bottom: '12mm', left: '12mm', right: '12mm' },
-    });
+    const pdf = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '12mm', right: '12mm', bottom: '12mm', left: '12mm' } });
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Length', pdf.length);
-    return res.status(200).send(pdf);
+    res.setHeader('Content-Disposition', 'inline; filename="rafiki-document.pdf"');
+    return res.status(200).send(Buffer.from(pdf));
+  } catch (error: unknown) {
+    return res.status(500).json({ error: error instanceof Error ? error.message : 'PDF_RENDER_FAILED' });
   } finally {
-    await browser.close();
+    await browser?.close();
   }
 }

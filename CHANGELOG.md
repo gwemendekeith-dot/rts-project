@@ -5,6 +5,22 @@ Format: `[YYYY-MM-DD] vX.X — Category — Description`
 
 ---
 
+## [2026-09-02] — Auditable Sale Cancellation
+
+### v0.27.0 — Refund-Gated Cancellation and Invoice Voiding
+**Files:** `supabase/migrations/0012_sale_cancellation.sql`, `src/lib/rpc.ts`, `src/pages/SaleWorkspace.tsx`
+- Added OWNER-only cancellation after every confirmed/partially-refunded payment is fully refunded.
+- Cancellation atomically releases serial stock, cancels pending installation work, voids invoices, refreshes inventory, and records audit history.
+- Added reason capture and actionable cancellation errors in Sale Workspace; direct financial-row deletion remains unavailable.
+
+## [2026-09-02] — Navigation, Data Workspaces, and PDF Recovery
+
+- Mobile sidebar now collapses automatically after navigation.
+- Replaced the broken `/sales` route with a live database sales ledger and connected enquiries, quotes, payments, and settings routes to their persisted tables.
+- Added the missing authenticated `/api/render-pdf` endpoint used by invoice/receipt generation.
+- Documents can regenerate an invoice whose file is missing, then open it through a short-lived signed Storage URL; unavailable files now show an actionable message.
+
+
 ## [2026-09-02] — Runtime Issue Remediation
 
 ### v0.25.0 — Inventory and Customer Persistence Fixes

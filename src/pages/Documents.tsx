@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { useRole } from '../hooks/useRole';
 import { voidDocument } from '../lib/rpc';
+import { issueInvoice } from '../lib/documents';
 import { Search, Send, Download, Ban } from 'lucide-react';
 import type { DocTypeEnum } from '../types/database';
 
@@ -14,6 +15,7 @@ interface DocRecord {
   created_at: string;
   file_reference: string | null;
   status: 'DRAFT' | 'ISSUED' | 'VOID';
+  sale_id: string | null;
   customers: { phone: string } | null;
 }
 
@@ -27,7 +29,7 @@ export const Documents: React.FC = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('documents')
-        .select('id, document_number, document_type, created_at, file_reference, status, customers(phone)')
+        .select('id, document_number, document_type, created_at, file_reference, status, sale_id, customers(phone)')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return (data ?? []) as unknown as DocRecord[];
@@ -41,6 +43,31 @@ export const Documents: React.FC = () => {
         document_id: docId,
         reason: 'Operator void request'
       });
+      await queryClient.invalidateQueries({ queryKey: ['documents'] });
+    } catch (error: unknown) {
+      alert(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const handleView = async (doc: DocRecord) => {
+    if (!doc.file_reference) {
+      alert('This document has no generated file yet. Re-issue it from the sale workspace.');
+      return;
+    }
+    try {
+      const { data, error } = await supabase.storage.from('documents').createSignedUrl(doc.file_reference, 300);
+      if (error) throw error;
+      if (!data?.signedUrl) throw new Error('No document URL was returned');
+      window.location.href = data.signedUrl;
+    } catch (error: unknown) {
+      alert(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const handleGenerate = async (doc: DocRecord) => {
+    if (!doc.sale_id || doc.document_type !== 'INVOICE') return;
+    try {
+      await issueInvoice(doc.sale_id);
       await queryClient.invalidateQueries({ queryKey: ['documents'] });
     } catch (error: unknown) {
       alert(error instanceof Error ? error.message : String(error));
@@ -110,17 +137,13 @@ export const Documents: React.FC = () => {
                   </td>
                   <td className="py-3 px-3 text-right">
                     <div className="flex items-center justify-end space-x-2">
+                      {!doc.file_reference && doc.document_type === 'INVOICE' && doc.sale_id && <button onClick={() => void handleGenerate(doc)} className="bg-amber-500 px-2.5 py-1 rounded text-[11px] font-semibold text-slate-900">Generate PDF</button>}
                       <button
-                        disabled={!doc.file_reference}
-                        onClick={() => {
-                          if (!doc.file_reference) return;
-                          const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_reference);
-                          window.open(data.publicUrl, '_blank', 'noopener,noreferrer');
-                        }}
+                        onClick={() => void handleView(doc)}
                         className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded text-[11px] font-semibold flex items-center space-x-1"
                       >
                         <Download className="w-3.5 h-3.5" />
-                        <span>View / Download</span>
+                        <span>{doc.file_reference ? 'View / Download' : 'File unavailable'}</span>
                       </button>
                       <button
                         disabled={!doc.customers?.phone || !doc.file_reference}

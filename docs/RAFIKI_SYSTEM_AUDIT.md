@@ -123,7 +123,7 @@ The database activation logic is directionally aligned with the six-month-from-i
 
 **P1-06 — New Sale is a chain of non-atomic operations.** Customer creation, sale creation, payment, receipt issuance, invoice issuance, storage upload, and document linking are separate calls. A later failure leaves earlier records committed. The UI only reports overall success after the chain, but there is no compensating workflow for partial completion.
 
-**P1-07 — Serial reservation and installation creation are coupled to the first payment, not an explicitly completed sale transition.** This may match the stated first-payment reservation rule, but the system does not expose a robust cancellation/release workflow from the UI, and mixed preorder/serialized item behavior is not clearly constrained.
+**P1-07 — Serial reservation and installation creation are coupled to the first payment, not an explicitly completed sale transition.** This may match the stated first-payment reservation rule, but mixed preorder/serialized item behavior is not clearly constrained. The cancellation/release gap is now addressed by the OWNER-only `fn_cancel_sale` workflow in migration 0012; deployment and authenticated verification remain required.
 
 ## Phase 4 — New Sale Forensic Test
 

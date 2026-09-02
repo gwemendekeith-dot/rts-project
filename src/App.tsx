@@ -8,6 +8,7 @@ const Login = lazy(() => import('./pages/Login').then(module => ({ default: modu
 const Dashboard = lazy(() => import('./pages/Dashboard').then(module => ({ default: module.Dashboard })));
 const NewSale = lazy(() => import('./pages/NewSale').then(module => ({ default: module.NewSale })));
 const SaleWorkspace = lazy(() => import('./pages/SaleWorkspace').then(module => ({ default: module.SaleWorkspace })));
+const Sales = lazy(() => import('./pages/Sales').then(module => ({ default: module.Sales })));
 const Inventory = lazy(() => import('./pages/Inventory').then(module => ({ default: module.Inventory })));
 const Installations = lazy(() => import('./pages/Installations').then(module => ({ default: module.Installations })));
 const InstallationDetail = lazy(() => import('./pages/InstallationDetail').then(module => ({ default: module.InstallationDetail })));
@@ -16,6 +17,7 @@ const Customer360 = lazy(() => import('./pages/Customer360').then(module => ({ d
 const Warranties = lazy(() => import('./pages/Warranties').then(module => ({ default: module.Warranties })));
 const Documents = lazy(() => import('./pages/Documents').then(module => ({ default: module.Documents })));
 const Reports = lazy(() => import('./pages/Reports').then(module => ({ default: module.Reports })));
+const DataWorkspace = lazy(() => import('./pages/Workspaces').then(module => ({ default: module.DataWorkspace })));
 
 function PageLoading() {
   return <div className="p-10 text-center text-slate-400">Loading page...</div>;
@@ -43,7 +45,7 @@ const ProtectedLayout: React.FC = () => {
         <Route path="/new-sale" element={<NewSale />} />
         <Route path="/sales/new" element={<NewSale />} />
         <Route path="/sales/:saleId" element={<SaleWorkspace />} />
-        <Route path="/sales" element={<SaleWorkspace />} />
+        <Route path="/sales" element={<Sales />} />
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/installations" element={<Installations />} />
         <Route path="/installations/:jobId" element={<InstallationDetail />} />
@@ -52,11 +54,11 @@ const ProtectedLayout: React.FC = () => {
         <Route path="/warranties" element={<Warranties />} />
         <Route path="/documents" element={<Documents />} />
         <Route path="/receipts" element={<Documents />} />
-        <Route path="/enquiries" element={<div className="text-slate-300">Enquiries Workspace</div>} />
-        <Route path="/quotes" element={<div className="text-slate-300">Quotes Workspace</div>} />
-        <Route path="/payments" element={<div className="text-slate-300">Payments Workspace</div>} />
+        <Route path="/enquiries" element={<DataWorkspace kind="enquiries" />} />
+        <Route path="/quotes" element={<DataWorkspace kind="quotes" />} />
+        <Route path="/payments" element={<DataWorkspace kind="payments" />} />
         <Route path="/reports" element={<Reports />} />
-        <Route path="/settings" element={<div className="text-slate-300">System Settings</div>} />
+        <Route path="/settings" element={<DataWorkspace kind="settings" />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppShell>

@@ -211,6 +211,8 @@ An invoice represents the sale obligation. A receipt represents money actually r
 - Refunds require a positive amount, a reason, and a selected payment.
 - Refunds are blocked after an installation is **COMPLETED**. The correct path after completion is a warranty claim, not a refund.
 - Never delete a sale, payment, serial, or document to correct an error.
+- To cancel an uncompleted sale, first refund every confirmed or partially refunded payment in full. Then open the sale workspace as OWNER, enter a clear cancellation reason, and select **Cancel Sale**. The system releases reserved/allocated serials, cancels pending installation work, voids the sale's invoices, and records audit events. Receipts and payment/refund history remain available.
+- Cancellation is blocked for completed or installed jobs. After installation completion, use the warranty process instead.
 - For duplicate payments, wrong serials, wrong prices, or failed document generation, preserve the records and escalate with the sale/payment/document numbers.
 
 ## 13. Common problems and safe responses

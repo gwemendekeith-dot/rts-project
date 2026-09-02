@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useRole } from '../../hooks/useRole';
 import { useAuth } from '../../hooks/useAuth';
 import { RoleSwitcher } from './RoleSwitcher';
@@ -28,8 +28,13 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const { isOwner, fullName } = useRole();
   const { signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname, location.search]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
