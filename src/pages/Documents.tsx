@@ -1,5 +1,7 @@
 import { openWhatsApp } from '../lib/whatsapp';
 import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '../lib/supabase';
 import { useRole } from '../hooks/useRole';
 import { voidDocument } from '../lib/rpc';
 import { Search, Send, Download, Ban } from 'lucide-react';
@@ -7,47 +9,30 @@ import type { DocTypeEnum } from '../types/database';
 
 interface DocRecord {
   id: string;
-  doc_number: string;
-  doc_type: DocTypeEnum;
+  document_number: string;
+  document_type: DocTypeEnum;
   created_at: string;
-  pdf_url: string;
-  is_void: boolean;
-  customer_phone?: string;
+  file_reference: string | null;
+  status: 'DRAFT' | 'ISSUED' | 'VOID';
+  customers: { phone: string } | null;
 }
 
 export const Documents: React.FC = () => {
   const { isOwner } = useRole();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
-  
-  const [docs, setDocs] = useState<DocRecord[]>([
-    {
-      id: 'doc-1',
-      doc_number: 'RTS-INV-2026-0012',
-      doc_type: 'INVOICE',
-      created_at: '2026-08-26 14:05',
-      pdf_url: 'https://placeholder.supabase.co/storage/v1/object/public/documents/invoices/RTS-INV-2026-0012.pdf',
-      is_void: false,
-      customer_phone: '+263771234567'
+
+  const docsQuery = useQuery({
+    queryKey: ['documents'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('id, document_number, document_type, created_at, file_reference, status, customers(phone)')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as DocRecord[];
     },
-    {
-      id: 'doc-2',
-      doc_number: 'RTS-RCP-2026-0008',
-      doc_type: 'RECEIPT',
-      created_at: '2026-08-26 14:10',
-      pdf_url: 'https://placeholder.supabase.co/storage/v1/object/public/documents/receipts/RTS-RCP-2026-0008.pdf',
-      is_void: false,
-      customer_phone: '+263771234567'
-    },
-    {
-      id: 'doc-3',
-      doc_number: 'RTS-WTY-2026-0002',
-      doc_type: 'WARRANTY_CERTIFICATE',
-      created_at: '2026-08-26 16:30',
-      pdf_url: 'https://placeholder.supabase.co/storage/v1/object/public/documents/warrantys/RTS-WTY-2026-0002.pdf',
-      is_void: false,
-      customer_phone: '+263771234567'
-    }
-  ]);
+  });
 
   const handleVoid = async (docId: string) => {
     if (!confirm('Are you sure you want to void this document?')) return;
@@ -56,15 +41,18 @@ export const Documents: React.FC = () => {
         document_id: docId,
         reason: 'Operator void request'
       });
-      setDocs(docs.map(d => d.id === docId ? { ...d, is_void: true } : d));
-    } catch {
-      setDocs(docs.map(d => d.id === docId ? { ...d, is_void: true } : d));
+      await queryClient.invalidateQueries({ queryKey: ['documents'] });
+    } catch (error: unknown) {
+      alert(error instanceof Error ? error.message : String(error));
     }
   };
 
-  const filteredDocs = docs.filter(d => 
-    d.doc_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    d.doc_type.toLowerCase().includes(searchQuery.toLowerCase())
+  if (docsQuery.isLoading) return <div className="p-10 text-center text-slate-400">Loading documents...</div>;
+  if (docsQuery.error) return <div className="p-10 text-center text-red-400">Could not load documents.</div>;
+  const docs = docsQuery.data ?? [];
+  const filteredDocs = docs.filter(d =>
+    d.document_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    d.document_type.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -102,15 +90,15 @@ export const Documents: React.FC = () => {
             <tbody className="divide-y divide-slate-800/60">
               {filteredDocs.map((doc) => (
                 <tr key={doc.id} className="hover:bg-slate-850/50 transition-colors">
-                  <td className="py-3 px-3 font-mono font-bold text-slate-200">{doc.doc_number}</td>
+                  <td className="py-3 px-3 font-mono font-bold text-slate-200">{doc.document_number}</td>
                   <td className="py-3 px-3">
                     <span className="bg-slate-800 text-slate-300 font-mono text-[10px] px-2 py-0.5 rounded font-bold">
-                      {doc.doc_type}
+                      {doc.document_type}
                     </span>
                   </td>
                   <td className="py-3 px-3 text-slate-400">{doc.created_at}</td>
                   <td className="py-3 px-3 text-center">
-                    {doc.is_void ? (
+                    {doc.status === 'VOID' ? (
                       <span className="bg-red-500/10 border border-red-500/30 text-red-400 text-[10px] font-bold px-2 py-0.5 rounded-full inline-block">
                         VOID
                       </span>
@@ -123,20 +111,30 @@ export const Documents: React.FC = () => {
                   <td className="py-3 px-3 text-right">
                     <div className="flex items-center justify-end space-x-2">
                       <button
-                        onClick={() => window.open(doc.pdf_url, '_blank')}
+                        disabled={!doc.file_reference}
+                        onClick={() => {
+                          if (!doc.file_reference) return;
+                          const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_reference);
+                          window.open(data.publicUrl, '_blank', 'noopener,noreferrer');
+                        }}
                         className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1 rounded text-[11px] font-semibold flex items-center space-x-1"
                       >
                         <Download className="w-3.5 h-3.5" />
                         <span>View / Download</span>
                       </button>
                       <button
-                        onClick={() => doc.customer_phone && openWhatsApp(doc.customer_phone, `Your Rafiki Thermal Solutions document ${doc.doc_number} is ready.`)}
+                        disabled={!doc.customers?.phone || !doc.file_reference}
+                        onClick={() => {
+                          if (!doc.customers?.phone || !doc.file_reference) return;
+                          const { data } = supabase.storage.from('documents').getPublicUrl(doc.file_reference);
+                          openWhatsApp(doc.customers.phone, `Your Rafiki Thermal Solutions document ${doc.document_number} is ready: ${data.publicUrl}`);
+                        }}
                         className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded text-[11px] font-semibold flex items-center space-x-1"
                       >
                         <Send className="w-3.5 h-3.5" />
                         <span>Share</span>
                       </button>
-                      {isOwner && !doc.is_void && (
+                      {isOwner && doc.status !== 'VOID' && (
                         <button
                           onClick={() => handleVoid(doc.id)}
                           className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 p-1 rounded"
@@ -149,6 +147,9 @@ export const Documents: React.FC = () => {
                   </td>
                 </tr>
               ))}
+              {filteredDocs.length === 0 && (
+                <tr><td colSpan={5} className="py-8 text-center text-slate-500">No database documents match this search.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
