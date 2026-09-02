@@ -5,6 +5,20 @@ Format: `[YYYY-MM-DD] vX.X — Category — Description`
 
 ---
 
+## [2026-09-02] — Principal Audit Pass 2
+
+### v0.23.0 — Remediation Verification & Migration Hardening
+**Files:** `supabase/migrations/0009_critical_remediation.sql`, `supabase/migrations/0008_security_and_integrity.sql`, `src/pages/NewSale.tsx`, `src/pages/Inventory.tsx`, `docs/RAFIKI_SYSTEM_AUDIT.md`, `docs/RAFIKI_REMEDIATION_LOG.md`
+- Independently audited the implementation against the Rafiki lifecycle and business rules.
+- Fixed migration 0009's invalid partial unique-constraint syntax by using an idempotent partial unique index for payment references.
+- Allowed NULL actors for system-generated audit events so migration and scheduler fallback logging can succeed.
+- Enforced QC `PASS` when validating serialized units for sale.
+- Read installation labour pricing from the configured `SVC-INSTALL` product when available.
+- Recorded the remaining transactional New Sale, document-generation, deployment, and authenticated end-to-end verification risks.
+- Verified `npm run build` passes; `npm run lint` passes with existing warnings.
+
+---
+
 ## [2026-08-27] — Deployment Fixes
 
 ### v0.22.0 — Reporting, Offline Drafts & Bundle Splitting

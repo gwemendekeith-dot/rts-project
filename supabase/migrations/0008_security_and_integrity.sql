@@ -199,8 +199,9 @@ BEGIN
     v_serial_id := NULLIF(v_item->>'serial_number_id', '')::UUID;
     IF v_product.requires_serial AND NOT p_is_preorder THEN
       IF v_serial_id IS NULL THEN RAISE EXCEPTION 'SERIAL_REQUIRED'; END IF;
-      IF NOT EXISTS (SELECT 1 FROM serial_numbers WHERE id = v_serial_id
-                     AND product_id = v_product.id AND status = 'AVAILABLE') THEN
+      IF NOT EXISTS (SELECT 1 FROM serial_numbers
+         WHERE id = v_serial_id AND product_id = v_product.id
+           AND status = 'AVAILABLE' AND qc_status = 'PASS') THEN
         RAISE EXCEPTION 'SERIAL_UNAVAILABLE';
       END IF;
     END IF;

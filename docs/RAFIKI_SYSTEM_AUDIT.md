@@ -246,3 +246,25 @@ Phases 11-29 require a subsequent pass after these initial findings are reviewed
 ## Initial Conclusion
 
 The project is buildable but not operationally trustworthy. The first remediation block should address RPC authentication/privilege exposure, the New Sale/schema/price contract, and the document generation contract before any live financial or inventory use.
+
+## Audit Pass 2 — Principal-Agent Verification (2026-09-02)
+
+This pass independently reconciled the repository with the prior remediation log and ran the available local checks. It did not treat the claimed deployment of migration 0009 as evidence of deployment.
+
+### Evidence
+
+- `npm run build`: **PASS** (TypeScript build and Vite production bundle).
+- `npm run lint`: **PASS WITH WARNINGS** (React purity/Fast Refresh warnings and generated Workbox warnings).
+- Authenticated Supabase lifecycle test: **NOT TESTABLE IN CURRENT ENVIRONMENT**. The repository contains only a publishable/anonymous client key; no authenticated test session, test-user credentials, or disposable database was provided.
+- Migration execution: **NOT TESTABLE LOCALLY**. Supabase CLI/local Postgres is not installed in this environment.
+
+### Newly Reproduced/Confirmed Findings
+
+1. **P0 deployment blocker in 0009 (fixed in repository):** PostgreSQL rejects a partial `UNIQUE` constraint expressed as `ALTER TABLE ... ADD CONSTRAINT ... WHERE`. This was replaced with an equivalent partial unique index.
+2. **P1 migration fallback blocker in 0009 (fixed in repository):** system audit rows use `user_id = NULL`, but the base schema marked `audit_logs.user_id NOT NULL`. The remediation migration now explicitly permits system-generated audit events.
+3. **P1 workflow integrity remains open:** `NewSale.tsx` performs customer creation, sale creation, payment, and document issuance as separate calls. Installation and parts are included in browser totals but are not represented in the `fn_create_sale` input or persisted sale total. This requires an architectural fix and confirmation of the intended commercial contract.
+4. **P1 document risk remains open:** the PDF edge function and browser document service still require schema/authorization/runtime verification against a deployed Supabase project.
+
+### Current readiness
+
+The local application is **PARTIALLY READY for continued engineering**, but **NOT READY for live financial/inventory operations** until migration 0009 is applied successfully and an authenticated disposable end-to-end lifecycle test verifies persisted records.

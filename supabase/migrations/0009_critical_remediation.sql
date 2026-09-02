@@ -8,6 +8,11 @@
 -- Apply after 0008.
 -- ============================================================
 
+-- System-generated events (for example, migration and scheduler failures) do
+-- not have an authenticated actor.  The base schema incorrectly required a
+-- user for every audit row, which made those safe fallback paths fail.
+ALTER TABLE audit_logs ALTER COLUMN user_id DROP NOT NULL;
+
 -- FIX 1: Installation Completion Must Require Payment
 -- Replace fn_complete_installation to verify sale has at least PARTIAL payment
 CREATE OR REPLACE FUNCTION fn_complete_installation(
@@ -290,8 +295,12 @@ END $$;
 -- Add a unique constraint to prevent duplicate payments on the same reference
 -- This requires a reference/idempotency_key field (future enhancement)
 -- For now, document best practice: use payment_reference field uniquely
-ALTER TABLE payments ADD CONSTRAINT uq_payment_reference_unique
-  UNIQUE (sale_id, payment_reference) WHERE payment_reference IS NOT NULL;
+-- PostgreSQL partial uniqueness is implemented as a unique index, not as a
+-- table constraint.  Keep NULL references allowed while making retries with
+-- the same non-NULL reference idempotent per sale.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_payment_reference_unique
+  ON payments (sale_id, payment_reference)
+  WHERE payment_reference IS NOT NULL;
 
 -- FIX 6: Prevent Negative/Invalid Inventory Movements
 ALTER TABLE inventory_movements ADD CONSTRAINT chk_inventory_movement_validity

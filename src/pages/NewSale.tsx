@@ -137,7 +137,9 @@ export const NewSale: React.FC = () => {
   }, []);
 
   const itemsSubtotal = lineItems.reduce((acc, item) => acc + (item.unit_price * item.quantity), 0);
-  const installFee = includeInstallation ? 70.00 : 0.00;
+  const installFee = includeInstallation
+    ? (products.find(p => p.sku === 'SVC-INSTALL')?.selling_price ?? 70.00)
+    : 0.00;
   const grandTotal = itemsSubtotal + installFee + Number(partsAmount || 0);
   const balanceDue = grandTotal - amountPaidNow;
 

@@ -519,3 +519,26 @@ CALL fn_record_payment(<sale_id>, 100, 'CASH', 'REF-UNIQUE-001');
 **Created**: 2026-08-27  
 **Status**: CRITICAL FIXES APPLIED — AWAITING TESTING
 
+---
+
+## PRINCIPAL AUDIT PASS 2 — 2026-09-02
+
+### Repository fixes applied
+
+- **0009 migration syntax:** replaced the invalid partial `ALTER TABLE ... ADD CONSTRAINT ... WHERE` statement with an idempotent partial unique index on `(sale_id, payment_reference)`.
+- **System audit events:** allowed `audit_logs.user_id` to be NULL so scheduler/migration events can be recorded without a human actor, matching the existing 0009 fallback logic.
+
+### Verification status
+
+- `npm run build`: PASS.
+- `npm run lint`: PASS WITH WARNINGS (existing React and generated Workbox warnings).
+- Migration execution: NOT VERIFIED; Supabase CLI/local Postgres unavailable.
+- Authenticated new-sale lifecycle: NOT VERIFIED; no authenticated disposable test session/database available.
+- The prior claim that all P1 fixes were production-ready remains unconfirmed until the migration is applied and the persisted lifecycle is queried end to end.
+
+### Remaining P1 / decision-gated work
+
+- New Sale still chains customer, sale, payment, and document mutations from the browser, so a later failure can leave partial records. A database transaction/RPC contract change is required.
+- Installation and parts amounts shown in the UI are not passed into `fn_create_sale`; the persisted financial total can differ from the confirmation screen. **[DECISION REQUIRED — KEITH]** is retained for the authoritative pricing/install/parts contract.
+- PDF generation and document field mappings require deployment-level verification.
+
