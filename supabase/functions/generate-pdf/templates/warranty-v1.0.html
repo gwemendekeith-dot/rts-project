@@ -14,6 +14,7 @@
     .bl { bottom: 8px; left: 8px; border-right: none; border-top: none; }
     .br { bottom: 8px; right: 8px; border-left: none; border-top: none; }
     .head { text-align: center; margin-bottom: 30px; }
+    .logo { width: 110px; height: 70px; object-fit: contain; margin-bottom: 12px; }
     .head h1 { font-size: 32px; letter-spacing: 4px; text-transform: uppercase; margin: 0; }
     .head p { color: #f59e0b; font-weight: 700; margin: 8px 0 0; font-size: 16px; }
     .head .number { color: #64748b; font-size: 12px; margin-top: 5px; }
@@ -36,6 +37,7 @@
     <div class="corner bl"></div><div class="corner br"></div>
 
     <div class="head">
+      <img class="logo" src="{{logo_data_uri}}" alt="Rafiki Thermal Solutions" />
       <h1>Warranty Certificate</h1>
       <p>RAFIKI THERMAL SOLUTIONS</p>
       <div class="number">Certificate # {{warranty_number}}</div>

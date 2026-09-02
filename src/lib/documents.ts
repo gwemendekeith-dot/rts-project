@@ -3,6 +3,7 @@ import { hydrateTemplate, renderPdf, uploadPdfToStorage, lineItemRow } from './p
 import receiptTpl from '../../supabase/functions/generate-pdf/templates/receipt-v1.0.html?raw';
 import invoiceTpl from '../../supabase/functions/generate-pdf/templates/invoice-v1.0.html?raw';
 import warrantyTpl from '../../supabase/functions/generate-pdf/templates/warranty-v1.0.html?raw';
+import logoSvg from '../../public/rafiki-logo.svg?raw';
 
 const fmtDate = (date: string | Date) =>
   new Date(date).toLocaleDateString('en-GB', {
@@ -54,6 +55,7 @@ type WarrantyRecord = {
 
 type IssuedDocument = { id: string; document_number: string };
 export type GeneratedDocument = { url: string; documentNumber: string };
+const logoDataUri = `data:image/svg+xml;base64,${btoa(logoSvg)}`;
 
 async function baseSettings(): Promise<Record<string, string>> {
   const { data, error } = await supabase
@@ -139,6 +141,7 @@ export async function issueReceipt(saleId: string, paymentId: string): Promise<G
 
   const html = hydrateTemplate(receiptTpl, {
     ...settings,
+    LOGO_DATA_URI: logoDataUri,
     DOCUMENT_NUMBER: document.document_number,
     ISSUE_DATE: fmtDate(paymentRecord.payment_date),
     PAYMENT_METHOD: paymentRecord.payment_method.replace(/_/g, ' '),
@@ -162,6 +165,7 @@ export async function issueInvoice(saleId: string): Promise<GeneratedDocument> {
   });
   const html = hydrateTemplate(invoiceTpl, {
     ...settings,
+    LOGO_DATA_URI: logoDataUri,
     DOCUMENT_NUMBER: document.document_number,
     ISSUE_DATE: fmtDate(sale.sale_date ?? sale.created_at),
     CUSTOMER_NAME: `${sale.customers.first_name} ${sale.customers.last_name || ''}`.trim(),
@@ -198,6 +202,7 @@ export async function issueWarrantyCertificate(installationId: string): Promise<
   });
   const html = hydrateTemplate(warrantyTpl, {
     ...settings,
+    LOGO_DATA_URI: logoDataUri,
     WARRANTY_NUMBER: document.document_number,
     SERIAL_NUMBER: warranty.serial_numbers.serial_number,
     PRODUCT_MODEL: warranty.serial_numbers.products?.name ?? '',

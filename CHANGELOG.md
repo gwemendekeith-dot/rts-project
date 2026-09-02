@@ -36,6 +36,10 @@ Format: `[YYYY-MM-DD] vX.X — Category — Description`
 - Removed service-worker caching for Supabase/Auth API responses, enabled cache cleanup, and configured Supabase session persistence/automatic token refresh.
 - React Query now refetches on focus/reconnect and retries transient failures, reducing stale pages and manual refreshes.
 
+## [2026-09-02] — Branded Documents
+
+- Added the supplied Rafiki SVG logo to invoice, receipt, and warranty PDF templates through a shared embedded data URI, so generated documents render correctly without external image loading.
+
 
 ## [2026-09-02] — Runtime Issue Remediation
 
