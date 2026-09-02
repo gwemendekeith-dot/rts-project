@@ -18,7 +18,12 @@ export async function renderPdf(html: string): Promise<Blob> {
     },
     body: JSON.stringify({ html }),
   });
-  if (!res.ok) throw new Error(`PDF render failed (${res.status})`);
+  if (!res.ok) {
+    const detail = await res.text();
+    let message = detail;
+    try { message = (JSON.parse(detail) as { error?: string }).error ?? detail; } catch { /* keep raw response */ }
+    throw new Error(`PDF render failed (${res.status}): ${message}`);
+  }
   return res.blob();
 }
 

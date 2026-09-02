@@ -9,7 +9,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' });
   const authorization = typeof req.headers.authorization === 'string' ? req.headers.authorization : '';
   const request = new Request(`https://${req.headers.host ?? 'localhost'}${req.url ?? '/api/render-pdf'}`, { headers: { authorization } });
-  const { error } = await verifyAuth(request, { auth: 'user' });
+  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
+  const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.VITE_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !publishableKey) return res.status(500).json({ error: 'PDF_AUTH_CONFIG_MISSING' });
+  const { error } = await verifyAuth(request, {
+    auth: 'user',
+    env: { url: supabaseUrl, publishableKeys: { default: publishableKey }, jwks: new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`) },
+  });
   if (error) return res.status(error.status).json({ error: 'AUTHENTICATION_REQUIRED' });
 
   const html = typeof req.body === 'object' && req.body !== null && 'html' in req.body

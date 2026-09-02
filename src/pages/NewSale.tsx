@@ -642,8 +642,11 @@ export const NewSale: React.FC = () => {
                 {referralPartnerId && (
                   <li>Accrue Flat $10.00 Referral Partner Commission</li>
                 )}
-                {includeInstallation && (
+                {includeInstallation && amountPaidNow > 0 && (
                   <li>Create Installation Job <strong className="text-amber-400">RTS-INS-2026-XXXX</strong> ($70 labour snapshot)</li>
+                )}
+                {includeInstallation && amountPaidNow <= 0 && (
+                  <li className="text-amber-400">Installation job will be created automatically after the first confirmed payment.</li>
                 )}
               </ul>
             </div>

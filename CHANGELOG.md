@@ -20,6 +20,16 @@ Format: `[YYYY-MM-DD] vX.X — Category — Description`
 - Added the missing authenticated `/api/render-pdf` endpoint used by invoice/receipt generation.
 - Documents can regenerate an invoice whose file is missing, then open it through a short-lived signed Storage URL; unavailable files now show an actionable message.
 
+## [2026-09-02] — Payment and Cancellation UX
+
+- Payment recording now refetches the newly created payment before issuing its receipt, avoiding stale-payment document errors and improving object-shaped error messages.
+- Sale cancellation is now rendered only on the Overview tab to reduce accidental cancellations.
+
+## [2026-09-02] — PDF Diagnostics and Installation Lifecycle UX
+
+- PDF renderer now uses the deployed Supabase URL/publishable key configuration fallback and returns the underlying failure detail to the operator instead of a generic 500.
+- New Sale confirmation and Sale Workspace now explain that installation jobs are created after the first confirmed payment; empty Installations now identifies this cause.
+
 
 ## [2026-09-02] — Runtime Issue Remediation
 

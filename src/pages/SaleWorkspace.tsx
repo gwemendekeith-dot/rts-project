@@ -71,11 +71,13 @@ export function SaleWorkspace() {
   async function submitPayment() {
     setBusy(true);
     try {
-      await recordPayment({ sale_id: sale.id, amount_usd: amount, payment_method: method, reference_code: reference || undefined, recorded_by: sale.id });
-      const latest = paymentsQuery.data?.[0];
-      if (latest) await issueReceipt(sale.id, latest.id);
+      const result = await recordPayment({ sale_id: sale.id, amount_usd: amount, payment_method: method, reference_code: reference || undefined, recorded_by: sale.id });
+      const paymentNumber = result && typeof result === 'object' && !Array.isArray(result) && 'payment_number' in result ? String(result.payment_number) : '';
+      const refreshed = await paymentsQuery.refetch();
+      const createdPayment = refreshed.data?.find(payment => payment.payment_number === paymentNumber);
+      if (createdPayment) await issueReceipt(sale.id, createdPayment.id);
       setPaymentOpen(false); setAmount(0); setReference(''); await queryClient.invalidateQueries();
-    } catch (error: unknown) { alert(error instanceof Error ? error.message : String(error)); }
+    } catch (error: unknown) { alert(error instanceof Error ? error.message : typeof error === 'object' ? JSON.stringify(error) : String(error)); }
     finally { setBusy(false); }
   }
 
@@ -83,7 +85,7 @@ export function SaleWorkspace() {
     if (!refundPayment || !refundReason || refundAmount <= 0) return;
     setBusy(true);
     try { await issueRefund({ payment_id: refundPayment, amount: refundAmount, reason: refundReason }); setRefundPayment(''); setRefundReason(''); await queryClient.invalidateQueries(); }
-    catch (error: unknown) { alert(error instanceof Error ? error.message : String(error)); }
+    catch (error: unknown) { alert(error instanceof Error ? error.message : typeof error === 'object' ? JSON.stringify(error) : String(error)); }
     finally { setBusy(false); }
   }
 
@@ -96,7 +98,7 @@ export function SaleWorkspace() {
       await cancelSale({ sale_id: sale.id, reason });
       setCancelReason('');
       await queryClient.invalidateQueries();
-    } catch (error: unknown) { alert(error instanceof Error ? error.message : String(error)); }
+    } catch (error: unknown) { alert(error instanceof Error ? error.message : typeof error === 'object' ? JSON.stringify(error) : String(error)); }
     finally { setBusy(false); }
   }
 
@@ -108,10 +110,10 @@ export function SaleWorkspace() {
     </header>
     <nav className="flex gap-1 overflow-x-auto border-b border-slate-800">{tabs.map(item => <button key={item} onClick={() => setTab(item)} className={`px-4 py-2 text-xs font-semibold capitalize ${tab === item ? 'border-b-2 border-amber-400 text-white' : 'text-slate-400'}`}>{item}</button>)}</nav>
     {tab === 'overview' && <section className="grid gap-4 md:grid-cols-2"><Panel title="Financial"><Row label="Total" value={usd(sale.total_amount)} /><Row label="Paid" value={usd(sale.amount_paid)} /><Row label="Balance due" value={usd(sale.balance_due)} /><Row label="Payment status" value={sale.payment_status} /></Panel><Panel title="Customer"><Row label="Name" value={`${customer?.first_name ?? ''} ${customer?.last_name ?? ''}`} /><Row label="Phone" value={customer?.phone ?? '-'} /><Row label="Address" value={customer?.address ?? '-'} /><Row label="Referral" value={sale.referral_source ?? '-'} /></Panel></section>}
-    {isOwner && sale.fulfilment_status !== 'CANCELLED' && sale.fulfilment_status !== 'INSTALLED' && sale.fulfilment_status !== 'COMPLETED' && <Panel title="Owner Cancellation"><p className="mb-3 text-xs text-slate-400">Refund every confirmed payment first. Cancellation voids invoices and releases reserved stock.</p><div className="flex gap-2"><input value={cancelReason} onChange={event => setCancelReason(event.target.value)} placeholder="Cancellation reason" className="flex-1 rounded border p-2 text-slate-900" /><button disabled={busy || !cancelReason.trim()} onClick={submitCancellation} className="rounded bg-red-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">Cancel Sale</button></div></Panel>}
+    {tab === 'overview' && isOwner && sale.fulfilment_status !== 'CANCELLED' && sale.fulfilment_status !== 'INSTALLED' && sale.fulfilment_status !== 'COMPLETED' && <Panel title="Owner Cancellation"><p className="mb-3 text-xs text-slate-400">Refund every confirmed payment first. Cancellation voids invoices and releases reserved stock.</p><div className="flex gap-2"><input value={cancelReason} onChange={event => setCancelReason(event.target.value)} placeholder="Cancellation reason" className="flex-1 rounded border p-2 text-slate-900" /><button disabled={busy || !cancelReason.trim()} onClick={submitCancellation} className="rounded bg-red-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">Cancel Sale</button></div></Panel>}
     {tab === 'items' && <Panel title="Purchased Items"><Table headers={['Item', 'Serial', 'Qty', 'Unit', 'Total']} rows={sale.sale_items.map(item => [item.products?.description ?? item.description, item.serial_numbers?.serial_number ?? '-', String(item.quantity), usd(item.unit_price), usd(item.line_total)])} /></Panel>}
     {tab === 'payments' && <Panel title="Payment Ledger"><div className="mb-4 flex justify-end"><button onClick={() => { setAmount(Math.max(Number(sale.balance_due), 0)); setPaymentOpen(true); }} className="rounded bg-amber-500 px-3 py-2 text-xs font-semibold text-slate-900">Record Payment</button></div><Table headers={['Receipt', 'Date', 'Method', 'Reference', 'Amount']} rows={(paymentsQuery.data ?? []).map(payment => [payment.payment_number, new Date(payment.payment_date).toLocaleString(), payment.payment_method, payment.payment_reference ?? '-', usd(payment.amount)])} /></Panel>}
-    {tab === 'installation' && <Panel title="Installation"><Row label="Job" value={jobQuery.data?.job_number ?? 'Not created'} /><Row label="Status" value={jobQuery.data?.status ?? 'Not created'} /><Row label="Scheduled" value={jobQuery.data?.scheduled_date ?? 'Not scheduled'} /></Panel>}
+    {tab === 'installation' && <Panel title="Installation"><Row label="Job" value={jobQuery.data?.job_number ?? 'Not created'} /><Row label="Status" value={jobQuery.data?.status ?? (sale.payment_status === 'UNPAID' ? 'Awaiting first payment' : 'Not created')} /><Row label="Scheduled" value={jobQuery.data?.scheduled_date ?? 'Not scheduled'} />{!jobQuery.data && sale.payment_status === 'UNPAID' && <p className="mt-3 text-xs text-amber-400">A confirmed first payment reserves the serial and creates the installation job automatically.</p>}</Panel>}
     {tab === 'documents' && <Panel title="Documents"><div className="space-y-2">{(docsQuery.data ?? []).map(doc => <div key={doc.id} className="flex items-center justify-between border-b border-slate-800 py-3 text-sm"><span>{doc.document_type} · {doc.document_number}</span><div className="flex gap-3">{doc.file_reference && <button onClick={() => openWhatsApp(customer?.phone ?? '', `Your ${doc.document_type} ${doc.document_number} is ready.`)} className="text-emerald-400">WhatsApp</button>}{isOwner && doc.status !== 'VOID' && <button onClick={async () => { await voidDocument({ document_id: doc.id, reason: 'Operator void request' }); await refresh(); }} className="text-red-400">Void</button>}</div></div>)}</div></Panel>}
     {tab === 'audit' && <Panel title="Audit Log"><div className="space-y-2">{(auditQuery.data ?? []).map(row => <div key={row.id} className="border-b border-slate-800 py-2 text-sm"><strong>{row.action}</strong><span className="ml-3 text-slate-500">{new Date(row.timestamp).toLocaleString()}</span>{row.reason && <p className="text-xs text-slate-500">{row.reason}</p>}</div>)}</div></Panel>}
     {paymentOpen && <Modal title="Record Payment"><input type="number" min={0.01} value={amount} onChange={event => setAmount(Number(event.target.value))} className="w-full rounded border p-2 text-slate-900" /><select value={method} onChange={event => setMethod(event.target.value as PaymentMethodEnum)} className="w-full rounded border p-2 text-slate-900"><option value="CASH">Cash</option><option value="BANK_TRANSFER">Bank Transfer</option><option value="CARD">Card</option></select><input value={reference} onChange={event => setReference(event.target.value)} placeholder="Reference" className="w-full rounded border p-2 text-slate-900" /><Actions busy={busy} onCancel={() => setPaymentOpen(false)} onConfirm={submitPayment} /> </Modal>}
