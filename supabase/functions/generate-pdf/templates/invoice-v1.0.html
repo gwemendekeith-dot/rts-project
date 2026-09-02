@@ -5,14 +5,13 @@
 <style>
   * { box-sizing: border-box; }
   body { font-family: Helvetica, Arial, sans-serif; color: #1e293b; margin: 0; font-size: 13px; line-height: 1.5; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start;
+  .header { display: flex; justify-content: space-between; align-items: center;
             border-bottom: 3px solid #f59e0b; padding-bottom: 16px; margin-bottom: 20px; }
-  .brand { display: flex; gap: 12px; align-items: center; }
-  .logo { width: 64px; height: 64px; object-fit: contain; border-radius: 10px; }
-  .brand h1 { margin: 0; font-size: 20px; color: #0f172a; }
+  .brand { display: flex; gap: 18px; align-items: center; flex: 1; min-width: 0; }
+  .logo { width: 140px; height: 140px; object-fit: contain; border-radius: 10px; flex: 0 0 auto; }
   .brand .tagline { color: #f59e0b; font-weight: 600; font-style: italic; font-size: 12px; margin: 2px 0; }
   .brand .loc { color: #64748b; font-size: 11px; margin: 0; }
-  .doc-title { text-align: right; } .doc-title h2 { margin: 0; font-size: 24px; letter-spacing: 1px; color: #0f172a; }
+  .doc-title { text-align: right; flex: 0 0 auto; } .doc-title h2 { margin: 0; font-size: 24px; letter-spacing: 1px; color: #0f172a; }
   .meta { width: 100%; border-collapse: collapse; margin-bottom: 18px; font-size: 12px; }
   .meta td { padding: 3px 6px; } .meta .k { color: #64748b; width: 130px; }
   table.items { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
@@ -34,7 +33,6 @@
     <div class="brand">
       <img class="logo" src="{{ LOGO_DATA_URI }}" alt="Rafiki Thermal Solutions" />
       <div>
-        <h1>RAFIKI THERMAL SOLUTIONS</h1>
         <p class="tagline">Hot Water on The Go, Smart Living</p>
         <p class="loc">Harare, Zimbabwe &nbsp;|&nbsp; {{ WHATSAPP }}</p>
       </div>
