@@ -268,3 +268,11 @@ This pass independently reconciled the repository with the prior remediation log
 ### Current readiness
 
 The local application is **PARTIALLY READY for continued engineering**, but **NOT READY for live financial/inventory operations** until migration 0009 is applied successfully and an authenticated disposable end-to-end lifecycle test verifies persisted records.
+
+## Runtime Verification — 2026-09-02
+
+A read-only probe of the configured Supabase REST endpoint confirmed:
+
+- `v_stock_dashboard` is reachable but currently exposes zero-quantity stock (only one seeded SKU row was returned), not received physical units.
+- `fn_create_customer` currently fails on the deployed schema when called without a session because its audit insert violates `audit_logs.user_id NOT NULL`. The forward migration 0010 adds the authentication guard and permits system-event audit rows; an authenticated browser retry is still required after deployment.
+- The frontend Inventory type was inconsistent with the deployed view (`quantity_available`, `quantity_reserved`, `quantity_on_hand`), which has now been corrected.

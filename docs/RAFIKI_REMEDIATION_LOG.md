@@ -542,3 +542,9 @@ CALL fn_record_payment(<sale_id>, 100, 'CASH', 'REF-UNIQUE-001');
 - Installation and parts amounts shown in the UI are not passed into `fn_create_sale`; the persisted financial total can differ from the confirmation screen. **[DECISION REQUIRED — KEITH]** is retained for the authoritative pricing/install/parts contract.
 - PDF generation and document field mappings require deployment-level verification.
 
+## Runtime Incident Follow-up — 2026-09-02
+
+- **Inventory display fixed:** `Inventory.tsx` now consumes the deployed view's authoritative quantity columns and explicitly reports empty stock/product-query failures.
+- **Customer creation fixed forward:** migration `0010_runtime_customer_inventory_fixes.sql` repairs the audit nullability mismatch, requires authentication for customer creation, adds payment-reference retry protection, and ensures unit products have zero-quantity inventory rows.
+- **Deployment required:** apply migration 0010 to the configured Supabase project, then retry customer creation and receive a test serial with OWNER access. Do not treat zero quantity as received stock; physical serials must be entered and QC-passed before a serialized sale.
+

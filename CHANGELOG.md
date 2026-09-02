@@ -5,6 +5,26 @@ Format: `[YYYY-MM-DD] vX.X — Category — Description`
 
 ---
 
+## [2026-09-02] — Runtime Issue Remediation
+
+### v0.25.0 — Inventory and Customer Persistence Fixes
+**Files:** `src/pages/Inventory.tsx`, `supabase/migrations/0010_runtime_customer_inventory_fixes.sql`, audit documentation
+- Corrected the Inventory page to use the deployed `v_stock_dashboard` quantity columns.
+- Added explicit empty-stock and product-query error states.
+- Added a forward migration that fixes customer audit persistence, requires authentication for customer creation, protects payment-reference retries, and creates zero-quantity rows for active unit products.
+- Documented the confirmed deployed failure and the required migration/application verification steps.
+
+---
+
+## [2026-09-02] — Operator Documentation
+
+### v0.24.0 — Rafiki User Manual
+**File:** `docs/RAFIKI_USER_MANUAL.md`
+- Added a step-by-step guide for sign-in, roles, customers, sales, payments, inventory, installations, warranties, documents, reports, refunds, and troubleshooting.
+- Documented current placeholder workspaces and unresolved transactional/deployment limitations so operators do not rely on unsupported flows.
+
+---
+
 ## [2026-09-02] — Principal Audit Pass 2
 
 ### v0.23.0 — Remediation Verification & Migration Hardening
