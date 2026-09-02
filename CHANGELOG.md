@@ -5,6 +5,11 @@ Format: `[YYYY-MM-DD] vX.X — Category — Description`
 
 ---
 
+## [2026-09-02] — QC-Gated Sale Selection
+
+- New Sale now lists only AVAILABLE serials with QC status `PASS`, matching the database reservation rule.
+- Added an inline prompt directing operators to Inventory to pass incoming-stock QC before selling a pending serial.
+
 ## [2026-09-02] — Auditable Sale Cancellation
 
 ### v0.27.0 — Refund-Gated Cancellation and Invoice Voiding

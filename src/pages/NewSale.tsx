@@ -33,6 +33,7 @@ interface SerialItem {
   id: string;
   serial_number: string;
   product_id: string;
+  qc_status: string | null;
 }
 
 interface ReferralPartner {
@@ -136,7 +137,14 @@ export const NewSale: React.FC = () => {
       if (prodError) throw new Error('Failed to load products from database');
       if (prodData) setProducts(prodData);
 
-      const { data: serialData, error: serialError } = await supabase.from('serial_numbers').select('*').eq('status', 'AVAILABLE');
+      // A serial may only be reserved once it has passed incoming-stock QC.
+      // Keep PENDING/FAIL units out of the sale picker so payment cannot fail
+      // later in fn_record_payment with SERIAL_QC_FAILED_AT_PAYMENT.
+      const { data: serialData, error: serialError } = await supabase
+        .from('serial_numbers')
+        .select('*')
+        .eq('status', 'AVAILABLE')
+        .eq('qc_status', 'PASS');
       if (serialError) throw new Error('Failed to load serial numbers from database');
       if (serialData) setAvailableSerials(serialData);
 
@@ -182,6 +190,12 @@ export const NewSale: React.FC = () => {
   };
 
   const handleConfirmSale = async () => {
+    const passSerialIds = new Set(availableSerials.map(serial => serial.id));
+    const blockedSerial = lineItems.find(item => !item.is_preorder && item.serial_number_id && !passSerialIds.has(item.serial_number_id));
+    if (blockedSerial) {
+      alert('This serial is not QC-passed and cannot be sold. Remove it, then choose a PASS serial from Inventory or record a pre-order.');
+      return;
+    }
     setSubmitting(true);
     try {
       const nameParts = customerName.trim().split(/\s+/);
@@ -436,6 +450,11 @@ export const NewSale: React.FC = () => {
                   <option key={s.id} value={s.id}>{s.serial_number}</option>
                 ))}
               </select>
+              {selectedProductId && serialsForSelectedProd.length === 0 && (
+                <p className="mt-1.5 text-[11px] text-amber-400">
+                  No QC-passed serials are available. An OWNER must mark received stock as PASS in Inventory before it can be sold.
+                </p>
+              )}
             </div>
 
             <div className="flex items-end space-x-2">
