@@ -53,6 +53,7 @@ type WarrantyRecord = {
 };
 
 type IssuedDocument = { id: string; document_number: string };
+export type GeneratedDocument = { url: string; documentNumber: string };
 
 async function baseSettings(): Promise<Record<string, string>> {
   const { data, error } = await supabase
@@ -101,10 +102,10 @@ async function issueDocument(args: {
 }
 
 async function linkDocument(documentId: string, path: string): Promise<void> {
-  const { error } = await supabase
-    .from('documents')
-    .update({ file_reference: path })
-    .eq('id', documentId);
+  const { error } = await supabase.rpc('fn_link_document_file', {
+    p_document_id: documentId,
+    p_file_reference: path,
+  });
   if (error) throw error;
 }
 
@@ -122,7 +123,7 @@ function saleRows(items: SaleItemRecord[]): string {
   }).join('');
 }
 
-export async function issueReceipt(saleId: string, paymentId: string): Promise<string> {
+export async function issueReceipt(saleId: string, paymentId: string): Promise<GeneratedDocument> {
   const [settings, sale] = await Promise.all([baseSettings(), getSale(saleId)]);
   const { data: payment, error: paymentError } = await supabase
     .from('payments')
@@ -151,10 +152,10 @@ export async function issueReceipt(saleId: string, paymentId: string): Promise<s
   const path = `receipts/${document.document_number}.pdf`;
   const url = await uploadPdfToStorage(path, await renderPdf(html));
   await linkDocument(document.id, path);
-  return url;
+  return { url, documentNumber: document.document_number };
 }
 
-export async function issueInvoice(saleId: string): Promise<string> {
+export async function issueInvoice(saleId: string): Promise<GeneratedDocument> {
   const [settings, sale] = await Promise.all([baseSettings(), getSale(saleId)]);
   const document = await issueDocument({
     type: 'INVOICE', customerId: sale.customer_id, saleId,
@@ -174,7 +175,7 @@ export async function issueInvoice(saleId: string): Promise<string> {
   const path = `invoices/${document.document_number}.pdf`;
   const url = await uploadPdfToStorage(path, await renderPdf(html));
   await linkDocument(document.id, path);
-  return url;
+  return { url, documentNumber: document.document_number };
 }
 
 export async function issueWarrantyCertificate(installationId: string): Promise<string> {

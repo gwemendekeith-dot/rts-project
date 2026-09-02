@@ -548,3 +548,10 @@ CALL fn_record_payment(<sale_id>, 100, 'CASH', 'REF-UNIQUE-001');
 - **Customer creation fixed forward:** migration `0010_runtime_customer_inventory_fixes.sql` repairs the audit nullability mismatch, requires authentication for customer creation, adds payment-reference retry protection, and ensures unit products have zero-quantity inventory rows.
 - **Deployment required:** apply migration 0010 to the configured Supabase project, then retry customer creation and receive a test serial with OWNER access. Do not treat zero quantity as received stock; physical serials must be entered and QC-passed before a serialized sale.
 
+## Document Generation Follow-up — 2026-09-02
+
+- Added migration `0011_document_storage.sql` to create the `documents` Storage bucket, add authenticated upload/update and public-read policies, and expose `fn_link_document_file` for the RLS-protected file-reference update.
+- Updated invoice and receipt services to use the linking RPC rather than a direct table update.
+- New Sale now reports the underlying document error details and will not display or share a receipt number unless receipt generation actually succeeds.
+- WhatsApp invoice sharing now refuses to send an `undefined` URL and uses the issued invoice document number.
+

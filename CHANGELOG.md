@@ -14,6 +14,13 @@ Format: `[YYYY-MM-DD] vX.X — Category — Description`
 - Added a forward migration that fixes customer audit persistence, requires authentication for customer creation, protects payment-reference retries, and creates zero-quantity rows for active unit products.
 - Documented the confirmed deployed failure and the required migration/application verification steps.
 
+### v0.26.0 — Document Storage and Sharing Reliability
+**Files:** `supabase/migrations/0011_document_storage.sql`, `src/lib/documents.ts`, `src/pages/NewSale.tsx`
+- Added the documents Storage bucket and authenticated/public access policies.
+- Added an RPC-backed document file-link update compatible with RLS.
+- Returned issued invoice/receipt document numbers from generation services.
+- Prevented WhatsApp sharing when an invoice URL is unavailable and improved document error detail.
+
 ---
 
 ## [2026-09-02] — Operator Documentation

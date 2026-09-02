@@ -212,11 +212,12 @@ export const NewSale: React.FC = () => {
 
       let rcpNum: string | undefined;
       let invoiceUrl: string | undefined;
+      let invoiceNumber = String(saleData?.sale_number ?? saleId);
       let docErrors: string[] = [];
 
       if (amountPaidNow > 0) {
         try {
-          const payRes = await recordPayment({
+          await recordPayment({
             sale_id: saleId,
             amount_usd: amountPaidNow,
             payment_method: paymentMethod,
@@ -228,27 +229,29 @@ export const NewSale: React.FC = () => {
             .select('id').eq('sale_id', saleId).order('payment_date', { ascending: false }).limit(1).single();
           if (latestPayment) {
             try {
-              await issueReceipt(saleId, latestPayment.id);
+              const receipt = await issueReceipt(saleId, latestPayment.id);
+              rcpNum = receipt.documentNumber;
             } catch (docError) {
-              docErrors.push('Receipt generation failed');
+              docErrors.push(`Receipt generation failed: ${formatSupabaseError(docError)}`);
               console.error('Receipt issuance error:', docError);
             }
           }
-          rcpNum = payRes?.receipt_number;
         } catch (payError) {
-          throw new Error(`Payment failed: ${payError instanceof Error ? payError.message : String(payError)}`);
+          throw new Error(`Payment failed: ${formatSupabaseError(payError)}`);
         }
       }
 
       try {
-        invoiceUrl = await issueInvoice(saleId);
+        const invoice = await issueInvoice(saleId);
+        invoiceUrl = invoice.url;
+        invoiceNumber = invoice.documentNumber;
       } catch (docError) {
-        docErrors.push('Invoice generation failed');
+        docErrors.push(`Invoice generation failed: ${formatSupabaseError(docError)}`);
         console.error('Invoice issuance error:', docError);
       }
 
       await clearDraft(); // Delete draft on successful submission
-      setCompletedDoc({ inv: String(saleData?.sale_number ?? saleId), invoiceUrl, rcp: rcpNum });
+      setCompletedDoc({ inv: invoiceNumber, invoiceUrl, rcp: rcpNum });
       setShowConfirmModal(false);
 
       if (docErrors.length > 0) {
@@ -264,9 +267,13 @@ export const NewSale: React.FC = () => {
   };
 
   const handleWhatsAppSend = () => {
+    if (!completedDoc?.invoiceUrl) {
+      alert('The invoice PDF is not available yet. Open the sale workspace and re-issue the invoice before sharing it.');
+      return;
+    }
     openWhatsApp(
       customerPhone,
-      `Hello ${customerName}, thank you for choosing Rafiki Thermal Solutions! Your Invoice #${completedDoc?.inv} (Total: $${grandTotal.toFixed(2)}) is ready at ${completedDoc?.invoiceUrl}. Hot Water on The Go!`,
+      `Hello ${customerName}, thank you for choosing Rafiki Thermal Solutions! Your Invoice #${completedDoc.inv} (Total: $${grandTotal.toFixed(2)}) is ready at ${completedDoc.invoiceUrl}. Hot Water on The Go!`,
     );
   };
 
