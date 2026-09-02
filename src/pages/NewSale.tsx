@@ -35,6 +35,12 @@ interface SerialItem {
   product_id: string;
 }
 
+interface ReferralPartner {
+  id: string;
+  partner_number: string;
+  name: string;
+}
+
 interface SaleLineItem {
   product_id: string;
   sku: string;
@@ -59,6 +65,7 @@ export const NewSale: React.FC = () => {
   // Section 2: Items State
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [availableSerials, setAvailableSerials] = useState<SerialItem[]>([]);
+  const [referralPartners, setReferralPartners] = useState<ReferralPartner[]>([]);
   const [selectedProductId, setSelectedProductId] = useState('');
   const [selectedSerialId, setSelectedSerialId] = useState('');
   const [lineItems, setLineItems] = useState<SaleLineItem[]>([]);
@@ -132,6 +139,17 @@ export const NewSale: React.FC = () => {
       const { data: serialData, error: serialError } = await supabase.from('serial_numbers').select('*').eq('status', 'AVAILABLE');
       if (serialError) throw new Error('Failed to load serial numbers from database');
       if (serialData) setAvailableSerials(serialData);
+
+      const { data: partnerData, error: partnerError } = await supabase
+        .from('referral_partners')
+        .select('id, partner_number, name')
+        .eq('status', 'ACTIVE')
+        .order('name');
+      if (partnerError) {
+        console.warn('Referral partners unavailable; continuing without referral selection', partnerError);
+      } else if (partnerData) {
+        setReferralPartners(partnerData);
+      }
     }
     loadCatalog();
   }, []);
@@ -237,7 +255,7 @@ export const NewSale: React.FC = () => {
         alert(`Sale created successfully (Sale #${saleData?.sale_number}), but document generation failed: ${docErrors.join(', ')}. You can re-issue documents from the sale workspace.`);
       }
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = formatSupabaseError(error);
       alert(`Could not complete sale: ${message}`);
       setShowConfirmModal(false);
     } finally {
@@ -507,8 +525,9 @@ export const NewSale: React.FC = () => {
                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-100 focus:outline-none"
               >
                 <option value="">-- No Referral Partner --</option>
-                <option value="ref-1">Plumbing Direct Harare ($10.00)</option>
-                <option value="ref-2">Harare Hardware Supplies ($10.00)</option>
+                {referralPartners.map(partner => (
+                  <option key={partner.id} value={partner.id}>{partner.name} ({partner.partner_number})</option>
+                ))}
               </select>
             </div>
           </div>
@@ -645,3 +664,14 @@ export const NewSale: React.FC = () => {
     </div>
   );
 };
+
+function formatSupabaseError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error !== null) {
+    const details = error as { message?: string; code?: string; details?: string; hint?: string };
+    return [details.message, details.code && `code ${details.code}`, details.details, details.hint]
+      .filter(Boolean)
+      .join(' — ') || JSON.stringify(error);
+  }
+  return String(error);
+}
