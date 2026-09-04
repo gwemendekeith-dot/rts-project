@@ -7,11 +7,11 @@ export type Json =
   | Json[];
 
 export type UserRoleEnum = 'OWNER' | 'SALES' | 'OPERATIONS';
-export type EnquiryStatusEnum = 'NEW' | 'CONTACTED' | 'QUOTED' | 'WON' | 'LOST';
-export type QuoteStatusEnum = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
+export type EnquiryStatusEnum = 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'QUOTE_REQUESTED' | 'CONVERTED' | 'LOST' | 'CLOSED';
+export type QuoteStatusEnum = 'DRAFT' | 'SENT' | 'VIEWED' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED' | 'CANCELLED' | 'CONVERTED';
 export type SaleStatusEnum = 'PENDING' | 'CONFIRMED' | 'SCHEDULED' | 'INSTALLED' | 'COMPLETED' | 'CANCELLED' | 'REFUNDED';
 export type PaymentStatusEnum = 'UNPAID' | 'PARTIAL' | 'PAID' | 'OVERPAID' | 'REFUND_DUE' | 'REFUNDED' | 'PARTIALLY_REFUNDED';
-export type PaymentMethodEnum = 'CASH' | 'BANK_TRANSFER' | 'CARD' | 'ECOCASH';
+export type PaymentMethodEnum = 'CASH' | 'BANK_TRANSFER' | 'CARD' | 'ECOCASH' | 'OTHER';
 export type SerialStatusEnum = 'AVAILABLE' | 'RESERVED' | 'ALLOCATED' | 'INSTALLED' | 'RETURNED' | 'DAMAGED' | 'SCRAPPED';
 export type InstallStatusEnum = 'PENDING' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export type WarrantyStatusEnum = 'ACTIVE' | 'EXPIRED' | 'CLAIMED' | 'VOID';
@@ -151,13 +151,17 @@ export interface Database {
       enquiries: {
         Row: {
           id: string;
-          customer_id: string | null;
-          channel: string;
-          notes: string;
+          enquiry_number: string;
+          customer_id: string;
+          source: string;
+          product_interest: string | null;
           status: EnquiryStatusEnum;
+          message: string | null;
+          assigned_to: string | null;
           created_at: string;
+          updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['enquiries']['Row'], 'id' | 'created_at'>;
+        Insert: Omit<Database['public']['Tables']['enquiries']['Row'], 'id' | 'enquiry_number' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['enquiries']['Insert']>;
       };
       quotes: {
@@ -165,10 +169,12 @@ export interface Database {
           id: string;
           quote_number: string;
           customer_id: string;
+          enquiry_id: string | null;
+          quote_date: string;
           status: QuoteStatusEnum;
           subtotal: number;
           discount: number;
-          total_amount: number;
+          total: number;
           valid_until: string | null;
           notes: string | null;
           created_by: string | null;
@@ -237,15 +243,17 @@ export interface Database {
           id: string;
           payment_number: string;
           sale_id: string;
+          customer_id: string;
           payment_date: string;
           amount: number;
+          currency: string;
           payment_method: PaymentMethodEnum;
           payment_reference: string | null;
           status: string;
-          created_by: string | null;
-          created_at: string;
+          received_by: string | null;
+          notes: string | null;
         };
-        Insert: Omit<Database['public']['Tables']['payments']['Row'], 'id' | 'payment_number' | 'payment_date' | 'created_at'>;
+        Insert: Omit<Database['public']['Tables']['payments']['Row'], 'id' | 'payment_number' | 'payment_date'>;
         Update: Partial<Database['public']['Tables']['payments']['Insert']>;
       };
       refunds: {

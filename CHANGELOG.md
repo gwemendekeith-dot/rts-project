@@ -5,6 +5,11 @@ Format: `[YYYY-MM-DD] vX.X — Category — Description`
 
 ---
 
+## [2026-09-02] — Operator Guidance Updates
+
+- Documented the QC workflow required before a serial can be sold or reserved at payment.
+- Added troubleshooting guidance for `SERIAL_QC_FAILED_AT_PAYMENT` and clarified the updated branded document letterhead.
+
 ## [2026-09-02] — QC-Gated Sale Selection
 
 - New Sale now lists only AVAILABLE serials with QC status `PASS`, matching the database reservation rule.
@@ -344,8 +349,6 @@ All functions LANGUAGE plpgsql SECURITY DEFINER:
 
 ---
 
-## Pending / Known Issues
+## Pending / Known Issues (Updated 2026-09-04)
 
-- **DocTypeEnum mismatch:** `src/types/database.ts` uses `'WARRANTY'` and `'INSTALLATION_CERT'` — must be updated to `'WARRANTY_CERTIFICATE'` and `'INSTALLATION_REPORT'` to match authoritative 0001_schema.sql
-- **Documents.tsx seed data** uses `'WARRANTY'` string — needs same correction once DocTypeEnum is fixed
-- **Stub pages:** Enquiries, Quotes, Payments (standalone), Settings — not yet implemented
+Current status: the document enum and Documents usage are corrected, and these routes now expose read-only data workspaces. Full create/edit/status workflows still require dedicated SECURITY DEFINER RPCs and audit coverage. Standalone Payments remains read-only; payment mutations continue through `fn_record_payment` in Sale Workspace. Database types were synchronised with the authoritative enquiry, quote, payment, and enum definitions on 2026-09-04.
