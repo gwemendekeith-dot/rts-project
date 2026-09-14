@@ -182,6 +182,73 @@ export async function issueInvoice(saleId: string): Promise<GeneratedDocument> {
   return { url, documentNumber: document.document_number };
 }
 
+/**
+ * Upload PDF for an invoice whose DB row was already created by fn_create_sale_full.
+ * Renders the template and uploads to Storage, then links the file path back to the document row.
+ * Returns the public URL of the uploaded file.
+ */
+export async function uploadInvoicePdfOnly(args: {
+  documentId: string;
+  documentNumber: string;
+  saleId: string;
+}): Promise<GeneratedDocument> {
+  const [settings, sale] = await Promise.all([baseSettings(), getSale(args.saleId)]);
+  const html = hydrateTemplate(invoiceTpl, {
+    ...settings,
+    LOGO_DATA_URI: logoDataUri,
+    DOCUMENT_NUMBER: args.documentNumber,
+    ISSUE_DATE: fmtDate(sale.sale_date ?? sale.created_at),
+    CUSTOMER_NAME: `${sale.customers.first_name} ${sale.customers.last_name || ''}`.trim(),
+    CUSTOMER_PHONE: sale.customers.phone,
+    CUSTOMER_ADDRESS: sale.customers.address ?? '',
+    LINE_ITEMS_ROWS: saleRows(sale.sale_items),
+    SUBTOTAL: Number(sale.total_amount).toFixed(2),
+    AMOUNT_PAID: Number(sale.amount_paid).toFixed(2),
+    BALANCE_DUE: Number(sale.balance_due).toFixed(2),
+  });
+  const path = `invoices/${args.documentNumber}.pdf`;
+  const url = await uploadPdfToStorage(path, await renderPdf(html));
+  await linkDocument(args.documentId, path);
+  return { url, documentNumber: args.documentNumber };
+}
+
+/**
+ * Upload PDF for a receipt whose DB row was already created by fn_create_sale_full.
+ */
+export async function uploadReceiptPdfOnly(args: {
+  documentId: string;
+  documentNumber: string;
+  saleId: string;
+  paymentId: string;
+}): Promise<GeneratedDocument> {
+  const [settings, sale] = await Promise.all([baseSettings(), getSale(args.saleId)]);
+  const { data: payment, error: paymentError } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('id', args.paymentId)
+    .single();
+  if (paymentError) throw paymentError;
+  if (!payment) throw new Error('Payment not found');
+  const paymentRecord = payment as unknown as PaymentRecord;
+  const html = hydrateTemplate(receiptTpl, {
+    ...settings,
+    LOGO_DATA_URI: logoDataUri,
+    DOCUMENT_NUMBER: args.documentNumber,
+    ISSUE_DATE: fmtDate(paymentRecord.payment_date),
+    PAYMENT_METHOD: paymentRecord.payment_method.replace(/_/g, ' '),
+    PAYMENT_REFERENCE: paymentRecord.payment_reference ?? '-',
+    PAYMENT_STATUS: sale.payment_status.replace(/_/g, ' '),
+    CUSTOMER_NAME: `${sale.customers.first_name} ${sale.customers.last_name || ''}`.trim(),
+    LINE_ITEMS_ROWS: saleRows(sale.sale_items),
+    SUBTOTAL: Number(sale.total_amount).toFixed(2),
+    TOTAL_PAID: Number(paymentRecord.amount).toFixed(2),
+  });
+  const path = `receipts/${args.documentNumber}.pdf`;
+  const url = await uploadPdfToStorage(path, await renderPdf(html));
+  await linkDocument(args.documentId, path);
+  return { url, documentNumber: args.documentNumber };
+}
+
 export async function issueWarrantyCertificate(installationId: string): Promise<string> {
   const [settings, warrantyResult] = await Promise.all([
     baseSettings(),

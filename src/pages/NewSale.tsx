@@ -1,19 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createCustomer, recordPayment } from '../lib/rpc';
+import { createSaleFull } from '../lib/rpc';
 import { supabase } from '../lib/supabase';
 import { openWhatsApp } from '../lib/whatsapp';
-import { issueInvoice, issueReceipt } from '../lib/documents';
+import { uploadInvoicePdfOnly, uploadReceiptPdfOnly } from '../lib/documents';
 import { useNewSaleDraft } from '../hooks/useNewSaleDraft';
-import { 
-  User, 
-  Plus, 
-  ShoppingCart, 
-  Wrench, 
-  CreditCard, 
-  CheckCircle2, 
-  Send, 
-  Save, 
+import {
+  User,
+  Plus,
+  ShoppingCart,
+  Wrench,
+  CreditCard,
+  CheckCircle2,
+  Send,
+  Save,
   AlertCircle,
   PackageCheck,
   Award,
@@ -57,12 +57,12 @@ export const NewSale: React.FC = () => {
   const [draftRestored, setDraftRestored] = useState(false);
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
   const navigate = useNavigate();
-  
+
   // Section 1: Customer State
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
-  
+
   // Section 2: Items State
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [availableSerials, setAvailableSerials] = useState<SerialItem[]>([]);
@@ -84,7 +84,15 @@ export const NewSale: React.FC = () => {
   // Section 5: Confirmation Modal & Success State
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [completedDoc, setCompletedDoc] = useState<{ inv: string; invoiceUrl?: string; rcp?: string } | null>(null);
+  const [completedDoc, setCompletedDoc] = useState<{
+    inv: string;
+    invoiceUrl?: string;
+    invoiceId?: string;
+    rcp?: string;
+    receiptId?: string;
+    saleId?: string;
+    paymentId?: string;
+  } | null>(null);
 
   // ── Restore draft on mount ──────────────────────────────────────────────────
   useEffect(() => {
@@ -191,7 +199,9 @@ export const NewSale: React.FC = () => {
 
   const handleConfirmSale = async () => {
     const passSerialIds = new Set(availableSerials.map(serial => serial.id));
-    const blockedSerial = lineItems.find(item => !item.is_preorder && item.serial_number_id && !passSerialIds.has(item.serial_number_id));
+    const blockedSerial = lineItems.find(
+      item => !item.is_preorder && item.serial_number_id && !passSerialIds.has(item.serial_number_id)
+    );
     if (blockedSerial) {
       alert('This serial is not QC-passed and cannot be sold. Remove it, then choose a PASS serial from Inventory or record a pre-order.');
       return;
@@ -199,78 +209,96 @@ export const NewSale: React.FC = () => {
     setSubmitting(true);
     try {
       const nameParts = customerName.trim().split(/\s+/);
-      const customer = await createCustomer({
-        first_name: nameParts[0] ?? '',
-        last_name: nameParts.slice(1).join(' ') || undefined,
-        phone: customerPhone,
-        address: customerAddress || undefined,
-      }) as { customer_id?: string };
-      const customerId = customer.customer_id;
-      if (!customerId) throw new Error('Customer creation did not return an ID');
 
-      const { data: saleData, error: saleError } = await supabase.rpc('fn_create_sale', {
-        p_customer_id: customerId,
-        p_referral_partner_id: referralPartnerId || null,
-        p_is_preorder: lineItems.some(item => item.is_preorder),
-        p_items: lineItems.map(item => ({
+      // Build the items list. If the operator checked "Include Installation",
+      // append the SVC-INSTALL line item so the DB total matches the UI grandTotal.
+      const installProduct = includeInstallation
+        ? products.find(p => p.sku === 'SVC-INSTALL')
+        : undefined;
+
+      const allItems = [
+        ...lineItems.map(item => ({
           product_id: item.product_id,
           quantity: item.quantity,
           unit_price: item.unit_price,
           discount: 0,
           serial_number_id: item.serial_number_id || null,
         })),
+        ...(installProduct
+          ? [{ product_id: installProduct.id, quantity: 1, unit_price: installProduct.selling_price, discount: 0 }]
+          : []),
+        ...(partsAmount > 0
+          ? (() => {
+              const partsProd = products.find(p => p.sku === 'SVC-PARTS');
+              return partsProd
+                ? [{ product_id: partsProd.id, quantity: 1, unit_price: partsAmount, discount: 0 }]
+                : [];
+            })()
+          : []),
+      ];
+
+      // ── ATOMIC TRANSACTION (one RPC, one DB round-trip) ──────────────────────
+      // Customer creation, sale, payment, serial reservation, installation job
+      // creation, and document row generation all happen inside one Postgres
+      // transaction. A dropped connection at any point leaves NO orphaned records.
+      const result = await createSaleFull({
+        customer: {
+          first_name: nameParts[0] ?? '',
+          last_name:  nameParts.slice(1).join(' ') || undefined,
+          phone:      customerPhone,
+          address:    customerAddress || undefined,
+        },
+        items: allItems,
+        payment: amountPaidNow > 0
+          ? { amount: amountPaidNow, payment_method: paymentMethod, reference: paymentReference || undefined }
+          : undefined,
+        sale_meta: {
+          referral_partner_id: referralPartnerId || undefined,
+          is_preorder: lineItems.some(item => item.is_preorder),
+        },
       });
-      if (saleError) throw saleError;
-      const saleId = saleData?.sale_id as string;
-      if (!saleId) throw new Error('Sale creation did not return an ID');
 
-      let rcpNum: string | undefined;
-      let invoiceUrl: string | undefined;
-      let invoiceNumber = String(saleData?.sale_number ?? saleId);
-      let docErrors: string[] = [];
-
-      if (amountPaidNow > 0) {
-        try {
-          await recordPayment({
-            sale_id: saleId,
-            amount_usd: amountPaidNow,
-            payment_method: paymentMethod,
-            reference_code: paymentReference,
-            recorded_by: saleId,
-          }) as { receipt_number?: string };
-
-          const { data: latestPayment } = await supabase.from('payments')
-            .select('id').eq('sale_id', saleId).order('payment_date', { ascending: false }).limit(1).single();
-          if (latestPayment) {
-            try {
-              const receipt = await issueReceipt(saleId, latestPayment.id);
-              rcpNum = receipt.documentNumber;
-            } catch (docError) {
-              docErrors.push(`Receipt generation failed: ${formatSupabaseError(docError)}`);
-              console.error('Receipt issuance error:', docError);
-            }
-          }
-        } catch (payError) {
-          throw new Error(`Payment failed: ${formatSupabaseError(payError)}`);
-        }
-      }
-
-      try {
-        const invoice = await issueInvoice(saleId);
-        invoiceUrl = invoice.url;
-        invoiceNumber = invoice.documentNumber;
-      } catch (docError) {
-        docErrors.push(`Invoice generation failed: ${formatSupabaseError(docError)}`);
-        console.error('Invoice issuance error:', docError);
-      }
-
-      await clearDraft(); // Delete draft on successful submission
-      setCompletedDoc({ inv: invoiceNumber, invoiceUrl, rcp: rcpNum });
+      // Transaction committed — clear the offline draft immediately.
+      await clearDraft();
+      setCompletedDoc({
+        inv:        result.invoice_number  ?? result.sale_number,
+        invoiceUrl: undefined,               // populated asynchronously below
+        invoiceId:  result.invoice_id   ?? undefined,
+        rcp:        result.receipt_number ?? undefined,
+        receiptId:  result.receipt_id   ?? undefined,
+        saleId:     result.sale_id,
+        paymentId:  result.payment_id   ?? undefined,
+      });
       setShowConfirmModal(false);
 
-      if (docErrors.length > 0) {
-        alert(`Sale created successfully (Sale #${saleData?.sale_number}), but document generation failed: ${docErrors.join(', ')}. You can re-issue documents from the sale workspace.`);
+      // ── NON-BLOCKING PDF UPLOAD ──────────────────────────────────────────────
+      // The DB rows are already committed. Generate and upload PDFs in the
+      // background; a network failure here will NOT orphan any records.
+      // The operator can always re-download or re-generate PDFs from the sale
+      // workspace (/sales/:saleId) if the upload fails.
+      if (result.invoice_id && result.invoice_number) {
+        uploadInvoicePdfOnly({
+          documentId:     result.invoice_id,
+          documentNumber: result.invoice_number,
+          saleId:         result.sale_id,
+        }).then(inv => {
+          setCompletedDoc(prev => prev ? { ...prev, invoiceUrl: inv.url } : prev);
+        }).catch(err => {
+          console.error('Background invoice PDF upload failed:', err);
+        });
       }
+
+      if (result.receipt_id && result.receipt_number && result.payment_id) {
+        uploadReceiptPdfOnly({
+          documentId:     result.receipt_id,
+          documentNumber: result.receipt_number,
+          saleId:         result.sale_id,
+          paymentId:      result.payment_id,
+        }).catch(err => {
+          console.error('Background receipt PDF upload failed:', err);
+        });
+      }
+
     } catch (error: unknown) {
       const message = formatSupabaseError(error);
       alert(`Could not complete sale: ${message}`);
@@ -598,7 +626,7 @@ export const NewSale: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs pt-2">
             <div>
-              <label className="block text-slate-400 mb-1">Payment Method (EcoCash Hidden)</label>
+              <label className="block text-slate-400 mb-1">Payment Method</label>
               <select
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value as PaymentMethodEnum)}
@@ -630,7 +658,7 @@ export const NewSale: React.FC = () => {
           className="w-full bg-rafiki-500 hover:bg-rafiki-600 font-extrabold text-white py-3.5 rounded-xl transition-colors shadow-lg shadow-rafiki-500/20 disabled:opacity-50 text-sm flex items-center justify-center space-x-2"
         >
           <PackageCheck className="w-5 h-5" />
-          <span>Review & Confirm Commercial Sale</span>
+          <span>Review &amp; Confirm Commercial Sale</span>
         </button>
       </div>
 
@@ -642,12 +670,12 @@ export const NewSale: React.FC = () => {
               <AlertCircle className="w-6 h-6 text-rafiki-400 shrink-0" />
               <div>
                 <h3 className="font-bold text-base text-white">Confirm Commercial Sale Execution</h3>
-                <p className="text-xs text-slate-400">Database Source of Truth Transaction</p>
+                <p className="text-xs text-slate-400">Atomic Database Transaction</p>
               </div>
             </div>
 
             <div className="space-y-3 text-xs text-slate-300">
-              <p>Review the exact database mutations that will be executed:</p>
+              <p>Review the exact database mutations that will be executed atomically:</p>
               <ul className="list-disc pl-5 space-y-1.5 text-slate-400">
                 <li>Create Customer record for <strong className="text-white">{customerName}</strong></li>
                 <li>Issue Invoice <strong className="text-white">RTS-INV-2026-XXXX</strong> for <strong className="text-white">${grandTotal.toFixed(2)}</strong></li>

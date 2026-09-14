@@ -84,6 +84,8 @@ If the request is for a new sale, the New Sale screen can also create the custom
 6. If no serialised unit is available, use **Record Pre-Order** only when the customer has agreed to a pre-order. A pre-order does not allocate a serial.
 7. Confirm every line item shown below the selectors.
 
+Only serials with QC status **PASS** appear in the sale picker. If a received serial is still **PENDING**, an OWNER must open **Inventory (Serials)**, inspect the unit, and select **Pass** before it can be sold. Failed or pending QC serials cannot be reserved when payment is recorded.
+
 Never type a price from memory or substitute another serial. Quotes do not consume stock; the first confirmed payment reserves a serial.
 
 ### 5.3 Installation and parts
@@ -140,6 +142,10 @@ Every payment is a separate event. Do not edit an old payment to represent a lat
 7. Confirm the available count and serial list after refresh.
 
 Duplicate serials are rejected or ignored by the database. Never reuse a serial for a replacement unit.
+
+### Incoming-stock QC
+
+After receiving stock, each serial starts as **PENDING**. An OWNER should inspect the physical unit and use **Pass** in the serial drill-down to set QC status to **PASS**. Use **Fail** when the unit does not pass inspection and keep it out of sale. Only PASS serials are offered in New Sale; this prevents the payment step from failing with `SERIAL_QC_FAILED_AT_PAYMENT`.
 
 ### Read serial status
 
@@ -222,6 +228,7 @@ An invoice represents the sale obligation. A receipt represents money actually r
 | `AUTHENTICATION_REQUIRED` | Sign in again; if it persists, contact an OWNER. |
 | `FORBIDDEN` | Switch to an assigned role with the required permission; do not bypass the control. |
 | `SERIAL_UNAVAILABLE` or `SERIAL_QC_FAILED` | Stop the sale and check Inventory for the exact physical unit and QC state. |
+| `SERIAL_QC_FAILED_AT_PAYMENT` | The serial is still PENDING or FAILED QC. Ask an OWNER to inspect it and select **Pass** in Inventory, then retry the payment with the PASS serial. |
 | `PAYMENT_METHOD_DISABLED` | Use Cash, Bank Transfer, or Card; EcoCash is hidden until enabled by system configuration. |
 | `PAYMENT_REQUIRED_BEFORE_INSTALLATION` | Record and verify the required payment before completing the job. |
 | `INSTALLATION_COMPLETE_NO_REFUND` | Do not issue a refund; follow the warranty process. |

@@ -188,6 +188,75 @@ export async function adjustSerialStatus(serialId: string, status: string, reaso
   return data;
 }
 
+// ── Atomic Sale Checkout (Option A) ─────────────────────────────────────────
+
+export interface CreateSaleFullCustomer {
+  /** Pass an existing customer_id to skip creation. */
+  customer_id?: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  city?: string;
+  customer_type?: string;
+  referral_source?: string;
+  notes?: string;
+}
+
+export interface CreateSaleFullItem {
+  product_id: string;
+  quantity: number;
+  unit_price: number;
+  discount?: number;
+  serial_number_id?: string | null;
+}
+
+export interface CreateSaleFullPayment {
+  amount: number;
+  payment_method: PaymentMethodEnum;
+  reference?: string;
+}
+
+export interface CreateSaleFullMeta {
+  referral_partner_id?: string;
+  referral_source?: string;
+  notes?: string;
+  is_preorder?: boolean;
+}
+
+export interface CreateSaleFullArgs {
+  customer: CreateSaleFullCustomer;
+  items: CreateSaleFullItem[];
+  payment?: CreateSaleFullPayment;
+  sale_meta?: CreateSaleFullMeta;
+}
+
+export interface CreateSaleFullResult {
+  customer_id: string;
+  customer_number: string;
+  sale_id: string;
+  sale_number: string;
+  total_amount: number;
+  payment_id: string | null;
+  payment_number: string | null;
+  invoice_id: string | null;
+  invoice_number: string | null;
+  receipt_id: string | null;
+  receipt_number: string | null;
+}
+
+export async function createSaleFull(args: CreateSaleFullArgs): Promise<CreateSaleFullResult> {
+  const { data, error } = await supabase.rpc('fn_create_sale_full', {
+    p_customer:  args.customer  as unknown as Json,
+    p_items:     args.items     as unknown as Json,
+    p_payment:   args.payment   as unknown as Json ?? null,
+    p_sale_meta: args.sale_meta as unknown as Json ?? {},
+  });
+  if (error) throw error;
+  return data as unknown as CreateSaleFullResult;
+}
+
 export async function createCustomer(args: {
   first_name: string;
   phone: string;
